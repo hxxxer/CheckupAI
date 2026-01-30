@@ -1,0 +1,40 @@
+# OCR Dependencies
+paddlepaddle==2.5.2
+paddleocr==2.7.0
+opencv-python==4.8.1.78
+Pillow==10.1.0
+
+# NLP and NER
+transformers==4.36.2
+torch==2.1.2
+tokenizers==0.15.0
+
+# Vector Database
+pymilvus==2.3.4
+
+# RAG and Embeddings
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+
+# API Framework
+fastapi==0.108.0
+uvicorn==0.25.0
+pydantic==2.5.3
+
+# Frontend
+chainlit==1.0.0
+
+# LLM Integration
+openai==1.6.1
+
+# Utilities
+python-dotenv==1.0.0
+pandas==2.1.4
+numpy==1.26.2
+pyyaml==6.0.1
+requests==2.31.0
+
+# LoRA Fine-tuning
+peft==0.7.1
+datasets==2.16.1
+accelerate==0.25.0

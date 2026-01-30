@@ -1,0 +1,44 @@
+/* CheckupAI Custom Styles */
+
+:root {
+  --primary-color: #1890ff;
+  --success-color: #52c41a;
+  --warning-color: #faad14;
+  --error-color: #f5222d;
+  --text-color: #262626;
+  --bg-color: #f0f2f5;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.message {
+  margin-bottom: 1rem;
+}
+
+.risk-high {
+  color: var(--error-color);
+  font-weight: bold;
+}
+
+.risk-medium {
+  color: var(--warning-color);
+  font-weight: bold;
+}
+
+.risk-low {
+  color: var(--success-color);
+  font-weight: bold;
+}
+
+.test-result {
+  padding: 0.5rem;
+  margin: 0.25rem 0;
+  border-left: 3px solid var(--primary-color);
+  background-color: #fafafa;
+}
+
+.abnormal-indicator {
+  color: var(--error-color);
+}

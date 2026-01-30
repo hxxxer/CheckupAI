@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sensitive Data - CRITICAL
+data/sensitive/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.docx
+*.doc
+
+# Model Files (too large for git)
+*.pth
+*.bin
+*.ckpt
+*.safetensors
+
+# Logs
+*.log
+logs/
+
+# Environment Variables
+.env
+.env.local
+
+# Chainlit
+.chainlit/
+.files/
+
+# Jupyter
+.ipynb_checkpoints/
