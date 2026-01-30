@@ -1,7 +1,7 @@
 """
 User Profile Sync Script
 
-This script syncs user profiles to Milvus vector database
+This script syncs user profiles to Milvus vector database using BGE-M3
 """
 
 import os
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 import json
 from datetime import datetime
-from sentence_transformers import SentenceTransformer
+from FlagEmbedding import BGEM3FlagModel
 from pymilvus import connections, Collection, CollectionSchema, FieldSchema, DataType
 
 # Add backend to path
@@ -23,11 +23,12 @@ def create_profile_collection():
     # Connect to Milvus
     connections.connect(host=config.MILVUS_HOST, port=config.MILVUS_PORT)
     
+    # BGE-M3 uses 1024-dimensional embeddings
     # Define schema
     fields = [
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
         FieldSchema(name="user_id", dtype=DataType.VARCHAR, max_length=100),
-        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=384),
+        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=1024),
         FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=2000),
         FieldSchema(name="timestamp", dtype=DataType.VARCHAR, max_length=50),
         FieldSchema(name="report_type", dtype=DataType.VARCHAR, max_length=100)
@@ -56,8 +57,8 @@ def sync_user_profile(user_id, profile_data):
         profile_data: User profile dictionary
     """
     
-    # Initialize encoder
-    encoder = SentenceTransformer(config.EMBEDDING_MODEL)
+    # Initialize BGE-M3 encoder
+    encoder = BGEM3FlagModel(config.EMBEDDING_MODEL, use_fp16=True)
     
     # Connect and get collection
     connections.connect(host=config.MILVUS_HOST, port=config.MILVUS_PORT)
@@ -93,8 +94,10 @@ def sync_user_profile(user_id, profile_data):
         print(f"No profile data to sync for user {user_id}")
         return
     
-    # Generate embeddings
-    embeddings = encoder.encode(profile_texts)
+    # Generate embeddings with BGE-M3
+    embeddings_output = encoder.encode(profile_texts, batch_size=12, max_length=8192)
+    # Use dense vectors for Milvus
+    embeddings = embeddings_output['dense_vecs']
     
     # Prepare data for insertion
     user_ids = [user_id] * len(profile_texts)

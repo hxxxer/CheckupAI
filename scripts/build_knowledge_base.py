@@ -2,14 +2,14 @@
 Build Knowledge Base Script
 
 This script processes medical documents and creates vector embeddings
-for the RAG knowledge base.
+for the RAG knowledge base using BGE-M3.
 """
 
 import os
 import sys
 from pathlib import Path
 import PyPDF2
-from sentence_transformers import SentenceTransformer
+from FlagEmbedding import BGEM3FlagModel
 from pymilvus import connections, Collection, CollectionSchema, FieldSchema, DataType
 import json
 
@@ -46,10 +46,11 @@ def create_knowledge_collection():
     # Connect to Milvus
     connections.connect(host=config.MILVUS_HOST, port=config.MILVUS_PORT)
     
+    # BGE-M3 uses 1024-dimensional embeddings
     # Define schema
     fields = [
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=384),
+        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=1024),
         FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=2000),
         FieldSchema(name="source", dtype=DataType.VARCHAR, max_length=500),
         FieldSchema(name="metadata", dtype=DataType.VARCHAR, max_length=1000)
@@ -103,10 +104,10 @@ def process_documents(raw_dir, processed_dir):
 
 
 def build_vector_database(processed_data):
-    """Build vector database from processed data"""
+    """Build vector database from processed data using BGE-M3"""
     
-    # Initialize encoder
-    encoder = SentenceTransformer(config.EMBEDDING_MODEL)
+    # Initialize BGE-M3 encoder
+    encoder = BGEM3FlagModel(config.EMBEDDING_MODEL, use_fp16=True)
     
     # Create collection
     collection = create_knowledge_collection()
@@ -116,9 +117,11 @@ def build_vector_database(processed_data):
     sources = [item['source'] for item in processed_data]
     metadata = [json.dumps({'chunk_id': item['chunk_id']}) for item in processed_data]
     
-    # Generate embeddings
-    print("Generating embeddings...")
-    embeddings = encoder.encode(texts, show_progress_bar=True)
+    # Generate embeddings with BGE-M3
+    print("Generating embeddings with BGE-M3...")
+    embeddings_output = encoder.encode(texts, batch_size=12, max_length=8192)
+    # Use dense vectors for Milvus
+    embeddings = embeddings_output['dense_vecs']
     
     # Insert into Milvus
     print("Inserting into Milvus...")

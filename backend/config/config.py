@@ -15,10 +15,8 @@ class Config:
     
     # Model Configuration
     MODEL_PATH = os.getenv('MODEL_PATH', './model/lora_checkpoint')
-    EMBEDDING_MODEL = os.getenv(
-        'EMBEDDING_MODEL',
-        'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
-    )
+    EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'BAAI/bge-m3')
+    RERANKER_MODEL = os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-v2-m3')
     
     # OpenAI Configuration (for LLM validation)
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')

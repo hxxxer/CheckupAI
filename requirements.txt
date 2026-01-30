@@ -15,6 +15,7 @@ pymilvus==2.3.4
 # RAG and Embeddings
 sentence-transformers==2.2.2
 faiss-cpu==1.7.4
+FlagEmbedding==1.2.10
 
 # API Framework
 fastapi==0.108.0

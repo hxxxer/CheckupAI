@@ -1,31 +1,44 @@
 """
 Dual-Path Retriever
 Combines knowledge base retrieval with user profile retrieval
+Uses BGE-M3 for embedding and BGE-reranker-v2-m3 for reranking
 """
 
 from pymilvus import connections, Collection
-from sentence_transformers import SentenceTransformer
+from FlagEmbedding import BGEM3FlagModel
 import numpy as np
+from .reranker import BGEReranker
 
 
 class DualPathRetriever:
     def __init__(self, 
                  milvus_host='localhost',
                  milvus_port='19530',
-                 embedding_model='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'):
+                 embedding_model='BAAI/bge-m3',
+                 reranker_model='BAAI/bge-reranker-v2-m3',
+                 use_reranker=True):
         """
         Initialize dual-path retriever
         
         Args:
             milvus_host: Milvus server host
             milvus_port: Milvus server port
-            embedding_model: Sentence embedding model
+            embedding_model: BGE-M3 embedding model
+            reranker_model: BGE reranker model
+            use_reranker: Whether to use reranker for result refinement
         """
         # Connect to Milvus
         connections.connect(host=milvus_host, port=milvus_port)
         
-        # Initialize embedding model
-        self.encoder = SentenceTransformer(embedding_model)
+        # Initialize BGE-M3 embedding model
+        self.encoder = BGEM3FlagModel(embedding_model, use_fp16=True)
+        
+        # Initialize reranker
+        self.use_reranker = use_reranker
+        if use_reranker:
+            self.reranker = BGEReranker(reranker_model, use_fp16=True)
+        else:
+            self.reranker = None
         
         # Collection names
         self.knowledge_collection_name = 'medical_knowledge'
@@ -44,30 +57,36 @@ class DualPathRetriever:
     
     def encode_query(self, query):
         """
-        Encode query text to embedding vector
+        Encode query text to embedding vector using BGE-M3
         
         Args:
             query: Query text
             
         Returns:
-            numpy array: Embedding vector
+            numpy array: Dense embedding vector
         """
-        embedding = self.encoder.encode([query])[0]
-        return embedding
+        # BGE-M3 returns dict with 'dense_vecs', 'lexical_weights', 'colbert_vecs'
+        embeddings = self.encoder.encode([query])
+        # Use dense vectors for Milvus search
+        return embeddings['dense_vecs'][0]
     
-    def retrieve_from_knowledge_base(self, query, top_k=5):
+    def retrieve_from_knowledge_base(self, query, top_k=5, rerank_top_k=None):
         """
         Retrieve relevant documents from knowledge base
         
         Args:
             query: User query
-            top_k: Number of results to return
+            top_k: Number of initial results to retrieve
+            rerank_top_k: Number of results after reranking (None = same as top_k)
             
         Returns:
-            list: Retrieved documents
+            list: Retrieved and optionally reranked documents
         """
         if not self.knowledge_collection:
             return []
+        
+        # Retrieve more candidates for reranking
+        retrieve_k = top_k * 3 if self.use_reranker else top_k
         
         query_embedding = self.encode_query(query)
         
@@ -80,7 +99,7 @@ class DualPathRetriever:
             data=[query_embedding.tolist()],
             anns_field="embedding",
             param=search_params,
-            limit=top_k,
+            limit=retrieve_k,
             output_fields=["text", "source", "metadata"]
         )
         
@@ -94,22 +113,31 @@ class DualPathRetriever:
                     'score': hit.score
                 })
         
+        # Apply reranking if enabled
+        if self.use_reranker and self.reranker and documents:
+            final_k = rerank_top_k if rerank_top_k is not None else top_k
+            documents = self.reranker.rerank(query, documents, top_k=final_k)
+        
         return documents
     
-    def retrieve_from_user_profile(self, user_id, query, top_k=3):
+    def retrieve_from_user_profile(self, user_id, query, top_k=3, rerank_top_k=None):
         """
         Retrieve relevant information from user profile
         
         Args:
             user_id: User identifier
             query: User query
-            top_k: Number of results to return
+            top_k: Number of initial results to retrieve
+            rerank_top_k: Number of results after reranking
             
         Returns:
-            list: Retrieved profile information
+            list: Retrieved and optionally reranked profile information
         """
         if not self.profile_collection:
             return []
+        
+        # Retrieve more candidates for reranking
+        retrieve_k = top_k * 3 if self.use_reranker else top_k
         
         query_embedding = self.encode_query(query)
         
@@ -125,7 +153,7 @@ class DualPathRetriever:
             data=[query_embedding.tolist()],
             anns_field="embedding",
             param=search_params,
-            limit=top_k,
+            limit=retrieve_k,
             expr=expr,
             output_fields=["text", "timestamp", "report_type"]
         )
@@ -139,6 +167,11 @@ class DualPathRetriever:
                     'report_type': hit.entity.get('report_type'),
                     'score': hit.score
                 })
+        
+        # Apply reranking if enabled
+        if self.use_reranker and self.reranker and profile_data:
+            final_k = rerank_top_k if rerank_top_k is not None else top_k
+            profile_data = self.reranker.rerank(query, profile_data, top_k=final_k)
         
         return profile_data
     
