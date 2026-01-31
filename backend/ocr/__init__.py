@@ -1,4 +1,4 @@
 """
-OCR Module for CheckupAI
-Handles table parsing using PaddleOCR
+OCR模块
+使用PaddleOCR处理体检报告
 """

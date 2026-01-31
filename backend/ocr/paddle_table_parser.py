@@ -1,6 +1,6 @@
 """
-Paddle Table Parser
-Uses PaddleOCR for table structure recognition and text extraction
+Paddle表格解析器
+使用PaddleOCR进行表格结构识别和文本识别
 """
 
 from paddleocr import PaddleOCR
@@ -11,10 +11,10 @@ import numpy as np
 class PaddleTableParser:
     def __init__(self, use_gpu=False):
         """
-        Initialize PaddleOCR with table recognition
+        初始化Paddle表格解析器
         
         Args:
-            use_gpu: Whether to use GPU acceleration
+            use_gpu: 是否使用GPU
         """
         self.ocr = PaddleOCR(
             use_angle_cls=True,
@@ -25,17 +25,17 @@ class PaddleTableParser:
     
     def parse_table(self, image_path):
         """
-        Parse table structure and extract text
+        解析表格结构并提取文本
         
         Args:
-            image_path: Path to the image file
+            image_path: 图片路径
             
         Returns:
-            dict: Parsed table data with structure and content
+            dict: 解析后的表格数据，包括结构和文本
         """
         result = self.ocr.ocr(image_path, cls=True)
         
-        # Process OCR results
+        # 处理结果
         parsed_data = {
             'text_boxes': [],
             'content': []
@@ -58,18 +58,18 @@ class PaddleTableParser:
     
     def extract_structured_data(self, image_path):
         """
-        Extract structured data from medical report table
+        从体检报告中提取结构化数据
         
         Args:
-            image_path: Path to the medical report image
+            image_path: 体检报告图片路径
             
         Returns:
-            dict: Structured medical report data
+            dict: 体检报告结构化数据
         """
         parsed = self.parse_table(image_path)
         
-        # TODO: Implement table structure recognition logic
-        # This should identify rows, columns, and key-value pairs
+        # TODO: 实现表格结构识别
+        # 这一功能应能够识别行、列以及键值对。
         
         return {
             'raw_text': parsed['content'],
