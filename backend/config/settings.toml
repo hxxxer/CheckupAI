@@ -29,7 +29,6 @@ gpu_id = 0
 output_format = "json"  # html/markdown/json
 
 [llm]
-# 表格解析提示词模板路径（可选）
-table_prompt_template = "backend/llm/prompts/table_parse.jinja2"
+table_template = "backend/ocr/llm_table_template.toml"
 max_retries = 3
 timeout_seconds = 120
