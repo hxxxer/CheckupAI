@@ -2,57 +2,38 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional
-import tomlib  # Python<3.11用tomli，>=3.11用tomllib
+import tomllib
 
 class Settings:
-    """配置管理器：TOML + 环境变量覆盖 + 路径验证"""
+    """配置管理器：TOML + 路径验证"""
     
     def __init__(self, config_path: Optional[str] = None):
         # 1. 确定配置文件路径
         if config_path:
             self.config_file = Path(config_path)
         else:
-            # 优先级：环境变量 > 项目config目录 > 当前目录
-            config_env = os.getenv("HEALTH_CONFIG_PATH")
-            if config_env:
-                self.config_file = Path(config_env)
-            else:
-                candidates = [
-                    Path("backend/config/settings.toml"),
-                    Path("config/settings.toml"),
-                    Path("settings.toml")
-                ]
-                self.config_file = next((p for p in candidates if p.exists()), None)
+            # 优先级：项目config目录 > 当前目录
+            candidates = [
+                Path("backend/config/settings.toml"),
+                Path("config/settings.toml"),
+                Path("settings.toml")
+            ]
+            self.config_file = next((p for p in candidates if p.exists()), None)
         
         if not self.config_file or not self.config_file.exists():
             raise FileNotFoundError(
                 "❌ 配置文件未找到！请：\n"
                 "1. 复制 backend/config/settings.toml.example → settings.toml\n"
-                "2. 填写实际conda环境路径\n"
-                "3. 设置环境变量 HEALTH_CONFIG_PATH 指向配置文件"
+                "2. 填写实际conda环境路径"
             )
         
         # 2. 加载TOML
         with open(self.config_file, "rb") as f:
-            raw_config = tomlib.load(f)
+            raw_config = tomllib.load(f)
         
-        # 3. 应用环境变量覆盖（命名规则：OCR_PYTHON 覆盖 env.ocr_python）
-        self._apply_env_overrides(raw_config)
-        
-        # 4. 解析为属性 + 路径标准化
+        # 3. 解析为属性 + 路径标准化
         self._parse_config(raw_config)
         self._validate_paths()
-    
-    def _apply_env_overrides(self, config: dict):
-        """环境变量优先级：OCR_PYTHON > TOML中的env.ocr_python"""
-        prefix_map = {"env": "OCR_", "paths": "PATH_"}
-        for section, prefix in prefix_map.items():
-            if section not in config:
-                continue
-            for key in config[section]:
-                env_key = f"{prefix}{key.upper()}"
-                if env_val := os.getenv(env_key):
-                    config[section][key] = env_val
     
     def _parse_config(self, config: dict):
         # 环境路径
@@ -76,7 +57,7 @@ class Settings:
     def _validate_paths(self):
         """关键路径存在性校验"""
         if not self.ocr_python:
-            raise ValueError("❌ ocr_python 未配置！请检查 settings.toml 或环境变量 OCR_PYTHON")
+            raise ValueError("❌ ocr_python 未配置！请检查 settings.toml")
         
         if not Path(self.ocr_python).exists():
             raise FileNotFoundError(f"❌ OCR环境Python不存在: {self.ocr_python}")
