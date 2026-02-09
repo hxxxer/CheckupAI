@@ -29,6 +29,6 @@ gpu_id = 0
 output_format = "json"  # html/markdown/json
 
 [llm]
-table_template = "backend/ocr/llm_table_template.toml"
+table_prompt = "backend/ocr/llm_table_prompt.toml"
 max_retries = 3
 timeout_seconds = 120

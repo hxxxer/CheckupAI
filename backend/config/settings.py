@@ -57,8 +57,8 @@ class Settings:
         # 业务参数
         self.ocr_use_gpu: bool = config.get("ocr", {}).get("use_gpu", True)
         self.ocr_gpu_id: int = config.get("ocr", {}).get("gpu_id", 0)
-        self.llm_table_template: str = str(
-            (project_root / config.get("llm", {}).get("table_template", "")).resolve())
+        self.llm_table_prompt: str = str(
+            (project_root / config.get("llm", {}).get("table_prompt", "")).resolve())
 
     def _validate_paths(self):
         """关键路径存在性校验"""

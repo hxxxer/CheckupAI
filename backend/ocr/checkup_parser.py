@@ -3,6 +3,7 @@ import json
 import re
 import os
 import subprocess
+import tomllib
 from datetime import datetime
 from bs4 import BeautifulSoup
 from collections import defaultdict
@@ -127,73 +128,34 @@ def table_md_to_json(table_md: str) -> Union[dict, list, None]:
     )
     tokenizer = llm.get_tokenizer()
 
-    prompt = """
-# Role
-你是一个专业的医疗数据结构化助手。你的任务是从体检报告的 OCR 识别结果（Markdown 格式）中提取关键指标，并将其转换为标准的 JSON 格式。
-# Rules
-1. **严格输出 JSON**：只返回 JSON 代码块，不要包含任何解释性文字、Markdown 标记（如 ```json）等内容。
-2. **噪音过滤**：请忽略所有非检查数据的信息，包括但不限于：
-   - 报告标题、医院名称、体检号、条形码。
-   - 页眉、页码、打印时间。
-   - 审核医生、检验者、报告日期、送检日期等。
-3. **语义推断**：
-   - 如果提取到的文本中包含箭头符号（↑ ↓ + -），将其提取到 `is_abnormal` 字段中。
-   - 如果数据没有单位，`unit` 填 null。
-# Output Schema
-请输出一个包含以下结构的 JSON 列表：
-[
-  {
-    "item_name": "检查项目名称 (如: 白细胞)",
-    "result": "检查结果 (字符串，保留原始符号)",
-    "unit": "单位 (如: g/L，若无则为 null)",
-    "reference_range": "参考范围 (如: 3.5-9.5，若无则为null)",
-    "is_abnormal": "异常标记 (如有箭头则保留箭头字符，如 '↑'，否则为 null)"
-  }
-]
-# Examples
-## Example 1 (标准单栏表格，包括大部分正常情况)
-### Input Markdown:
-| 项目名称 | 检查结果 | 单位 | 参考范围 |
-|---|---|---|---|
-| 红细胞 | ↑ 6 | 10^12/L | 4.0-5.5 |
-| 血红蛋白 | 135 | g/L | 120-160 |
-| 透明度 | 透明 |  |  |
-### Output JSON:
-[
-  {"item_name": "红细胞", "result": "6", "unit": "10^12/L", "reference_range": "4.0-5.5", "is_abnormal": "↑"},
-  {"item_name": "血红蛋白", "result": "135", "unit": "g/L", "reference_range": "120-160", "is_abnormal": null},
-  {"item_name": "透明度", "result": "透明", "unit": null, "reference_range": null, "is_abnormal": null}
-]
-## Example 2 (包含噪音的脏数据)
-### Input Markdown:
-| 项目名称 | 检查结果 | 单位 | 参考范围 |
-|---|---|---|---|
-| 蛋白质 | ↑ 45 | U/L | 0-40 |
-| 白细胞 | 28 | U/L | 0-40 |
-| 审核医生：张三 |  | 报告日期：2023-10-22 14:00:00 |  |
-| 第 1 页 / 共 2 页 |  |  |  |
-### Output JSON:
-[
-  {"item_name": "蛋白质", "result": "45", "unit": "U/L", "reference_range": "0-40", "is_abnormal": "↑"},
-  {"item_name": "白细胞", "result": "28", "unit": "U/L", "reference_range": "0-40", "is_abnormal": null}
-]
-## Example 3 (双栏表格)
-### Input Markdown:
-| 项目名称 | 检查结果 | 单位 | 参考值 | 项目名称 | 检查结果 | 单位 | 参考值 |
-|  ---  |  ---  |  ---  |  ---  |  ---  |  ---  |  ---  |  ---  |
-| 尿胆原 | 阴性 |  | 阴性 | 维生素C | 1.2 | mmol/L | 0.7-2.0 |
-| 葡萄糖 | 阴性 |  | 阴性 | 酸碱度 | ↓ 4.2 |  | 4.5-8.0 |
+    prompt_path = settings.llm_table_prompt
+    with open(prompt_path, "rb") as f:
+        raw_prompt = tomllib.load(f)
 
-### Output JSON:
-[
-  {"item_name": "尿胆原", "result": "阴性", "unit": null, "reference_range": "阴性", "is_abnormal": null},
-  {"item_name": "维生素C", "result": "1.2", "unit": "mmol/L", "reference_range": "0.7-2.0", "is_abnormal": null},
-  {"item_name": "葡萄糖", "result": "阴性", "unit": null, "reference_range": "阴性", "is_abnormal": null},
-  {"item_name": "酸碱度", "result": "4.2", "unit": null, "reference_range": "4.5-8.0", "is_abnormal": "↓"}
-]
-# Real Task
-请根据上述规则，处理以下真实的体检报告 Markdown 内容：
-    """
+    prompt = raw_prompt.get("prompt", {}).get("role", "") + "\n\n"
+    
+    if 'rules' in raw_prompt:
+        prompt += "规则：\n"
+        for key, rule in raw_prompt["rules"].items():
+            prompt += f"{key}：{rule}\n"
+        prompt += "\n"
+    
+    if 'output' in raw_prompt:
+        prompt += "输出格式：\n"
+        prompt += raw_prompt.get("title", "") + "\n"
+        prompt += raw_prompt.get("discription", "") + "\n\n"
+    
+    if 'examples' in raw_prompt:
+        prompt += "示例：\n"
+        for key, example in raw_prompt["examples"].items():
+            prompt += f"例子{key} - {example.get('title', '')}\n"
+            prompt += "输入：\n"
+            prompt += example.get("input", "") + "\n"
+            prompt += "输出：\n"
+            prompt += example.get("output", "") + "\n\n"
+    
+    prompt += raw_prompt.get("task", {}).get("instruction", "")
+
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": table_md}
