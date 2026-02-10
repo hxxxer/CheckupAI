@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Tuple, Optional, Union
 # from llama_cpp import Llama
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from vllm import LLM, SamplingParams
-from backend.settings import settings
+from backend.config import settings
 
 
 def parse_ocr_result(ocr_output: list) -> Dict[str, Any]:
@@ -118,7 +118,7 @@ def table_md_to_json(table_md: str) -> Union[dict, list, None]:
     model_path = "/root/autodl-tmp/models/Qwen/Qwen3-8B-AWQ"
 
     llm = get_llm(model_path)
-    
+
     tokenizer = llm.get_tokenizer()
 
     prompt = build_prompt()
