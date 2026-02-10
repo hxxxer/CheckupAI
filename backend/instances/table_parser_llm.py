@@ -115,6 +115,14 @@ class TableParserLLM:
         # 安全解析JSON
         return self.safe_json_parse(content)
 
+    def sleep(self):
+        if self._llm is not None:
+            self._llm.sleep(1)
+
+    def wake_up(self):
+        if self._llm is not None:
+            self._llm.wake_up()
+
     @staticmethod
     def safe_json_parse(text: str) -> Union[dict, list, None]:
         """

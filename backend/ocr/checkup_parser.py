@@ -31,6 +31,7 @@ def parse_ocr_result(ocr_output: list) -> Dict[str, Any]:
         elif block.get("block_label") == "table":
             table_blocks.append(block)
 
+    table_parser.wake_up()
     tables_data = []
     for idx, table_block in enumerate(table_blocks):
         try:
@@ -41,6 +42,7 @@ def parse_ocr_result(ocr_output: list) -> Dict[str, Any]:
         except Exception as e:
             print(f"⚠️ 表格块 {idx} 解析失败: {str(e)}")
             raise
+    table_parser.sleep()
 
     full_text = "\n".join([b["block_content"] for b in text_blocks])
 
@@ -113,7 +115,6 @@ def table_html_to_md(table_html: str) -> str:
     md = '\n'.join(md_lines)
 
     return md
-
 
 
 def run_ocr(input_path):
