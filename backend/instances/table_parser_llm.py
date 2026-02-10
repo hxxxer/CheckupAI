@@ -72,7 +72,7 @@ class TableParserLLM:
 
         return self._prompt
 
-    def generate(self, table_md: str) -> Union[dict, list, None]:
+    def parse(self, table_md: str) -> Union[dict, list, None]:
         """
         使用LLM生成结果并解析为JSON
         :param table_md: Markdown格式的表格数据
@@ -107,7 +107,7 @@ class TableParserLLM:
 
         # 执行推理
         llm = self._load_model()
-        outputs = llm.generate([text], sampling_params)
+        outputs = llm.parse([text], sampling_params)
         content = outputs[0].outputs[0].text
 
         # print("提取结果:", content)

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Tuple, Optional, Union
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from vllm import LLM, SamplingParams
 from backend.config import settings
+from backend.instances import table_parser
 
 
 def parse_ocr_result(ocr_output: list) -> Dict[str, Any]:
@@ -36,7 +37,7 @@ def parse_ocr_result(ocr_output: list) -> Dict[str, Any]:
             table_html = table_block.get("block_content")
             table_html = table_html_clean(table_html)
             table_md = table_html_to_md(table_html)
-            tables_data.append(table_md_to_json(table_md))
+            tables_data.append(table_parser.parse(table_md))
         except Exception as e:
             print(f"⚠️ 表格块 {idx} 解析失败: {str(e)}")
             raise
@@ -113,147 +114,6 @@ def table_html_to_md(table_html: str) -> str:
 
     return md
 
-
-def table_md_to_json(table_md: str) -> Union[dict, list, None]:
-    model_path = "/root/autodl-tmp/models/Qwen/Qwen3-8B-AWQ"
-
-    llm = get_llm(model_path)
-
-    tokenizer = llm.get_tokenizer()
-
-    prompt = build_prompt()
-
-    messages = [
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": table_md}
-    ]
-    text = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-        enable_thinking=False
-    )
-
-    sampling_params = SamplingParams(
-        temperature=0.7,
-        top_k=20,
-        top_p=0.8,
-        max_tokens=8192,
-        stop=["<|im_end|>", "<|endoftext|>"]  # 设置停止词
-    )
-
-    outputs = llm.generate([text], sampling_params)
-    content = outputs[0].outputs[0].text
-
-    print("提取结果:", content)
-    parsed_result = safe_json_parse(content)
-
-    if parsed_result is None:
-        return []
-    # elif isinstance(parsed_result, list):
-    #     return {"items": parsed_result}
-    else:
-        return parsed_result
-
-
-_llm = None
-
-
-def get_llm(model_path: str) -> Any:
-    global _llm
-    if _llm is None:
-        _llm = LLM(
-            model=model_path,
-            dtype="float16",
-            quantization="awq",
-            # gpu_memory_utilization=0.8,
-            max_model_len=16384,
-            enforce_eager=False,
-            trust_remote_code=True,
-        )
-    return _llm
-
-
-def build_prompt() -> str:
-    prompt_path = settings.llm_table_prompt
-    with open(prompt_path, "rb") as f:
-        raw_prompt = tomllib.load(f)
-
-    prompt = raw_prompt.get("prompt", {}).get("role", "") + "\n\n"
-
-    if 'rules' in raw_prompt:
-        prompt += "规则：\n"
-        for key, rule in raw_prompt["rules"].items():
-            prompt += f"{key}：{rule}\n"
-        prompt += "\n"
-
-    if 'output' in raw_prompt:
-        prompt += "输出格式：\n"
-        prompt += raw_prompt.get("title", "") + "\n"
-        prompt += raw_prompt.get("discription", "") + "\n\n"
-
-    if 'examples' in raw_prompt:
-        prompt += "示例：\n"
-        for key, example in raw_prompt["examples"].items():
-            prompt += f"例子{key} - {example.get('title', '')}\n"
-            prompt += "输入：\n"
-            prompt += example.get("input", "") + "\n"
-            prompt += "输出：\n"
-            prompt += example.get("output", "") + "\n\n"
-
-    prompt += raw_prompt.get("task", {}).get("instruction", "")
-
-    return prompt
-
-
-def safe_json_parse(text: str) -> Union[dict, list, None]:
-    """
-    安全地解析JSON，包含多种清理策略
-    """
-    if not text:
-        return None
-
-    # 清理文本
-    cleaned_text = text.strip()
-
-    # 移除常见的前缀/后缀
-    prefixes_to_remove = ['```json', '```', 'json']
-    suffixes_to_remove = ['```']
-
-    for prefix in prefixes_to_remove:
-        if cleaned_text.startswith(prefix):
-            cleaned_text = cleaned_text[len(prefix):].strip()
-            break
-
-    for suffix in suffixes_to_remove:
-        if cleaned_text.endswith(suffix):
-            cleaned_text = cleaned_text[:-len(suffix)].strip()
-            break
-
-    # 尝试直接解析
-    try:
-        return json.loads(cleaned_text)
-    except json.JSONDecodeError:
-        pass
-
-    # 尝试提取数组部分
-    array_matches = re.findall(r'\[[\s\S]*?\]', cleaned_text)
-    if array_matches:
-        try:
-            return json.loads(array_matches[-1])  # 使用最后一个匹配的数组
-        except json.JSONDecodeError:
-            pass
-
-    # 尝试提取对象部分
-    object_matches = re.findall(r'\{[\s\S]*?\}', cleaned_text)
-    if object_matches:
-        try:
-            return json.loads(object_matches[-1])
-        except json.JSONDecodeError:
-            pass
-
-    print(f"无法解析JSON: {text[:100]}...")
-    return None
 
 
 def run_ocr(input_path):
