@@ -117,44 +117,11 @@ def table_html_to_md(table_html: str) -> str:
 def table_md_to_json(table_md: str) -> Union[dict, list, None]:
     model_path = "/root/autodl-tmp/models/Qwen/Qwen3-8B-AWQ"
 
-    llm = LLM(
-        model=model_path,
-        dtype="float16",
-        quantization="awq",
-        # gpu_memory_utilization=0.8,
-        max_model_len=16384,
-        enforce_eager=False,
-        trust_remote_code=True,
-    )
+    llm = get_llm(model_path)
+    
     tokenizer = llm.get_tokenizer()
 
-    prompt_path = settings.llm_table_prompt
-    with open(prompt_path, "rb") as f:
-        raw_prompt = tomllib.load(f)
-
-    prompt = raw_prompt.get("prompt", {}).get("role", "") + "\n\n"
-    
-    if 'rules' in raw_prompt:
-        prompt += "规则：\n"
-        for key, rule in raw_prompt["rules"].items():
-            prompt += f"{key}：{rule}\n"
-        prompt += "\n"
-    
-    if 'output' in raw_prompt:
-        prompt += "输出格式：\n"
-        prompt += raw_prompt.get("title", "") + "\n"
-        prompt += raw_prompt.get("discription", "") + "\n\n"
-    
-    if 'examples' in raw_prompt:
-        prompt += "示例：\n"
-        for key, example in raw_prompt["examples"].items():
-            prompt += f"例子{key} - {example.get('title', '')}\n"
-            prompt += "输入：\n"
-            prompt += example.get("input", "") + "\n"
-            prompt += "输出：\n"
-            prompt += example.get("output", "") + "\n\n"
-    
-    prompt += raw_prompt.get("task", {}).get("instruction", "")
+    prompt = build_prompt()
 
     messages = [
         {"role": "system", "content": prompt},
@@ -187,6 +154,56 @@ def table_md_to_json(table_md: str) -> Union[dict, list, None]:
     #     return {"items": parsed_result}
     else:
         return parsed_result
+
+
+_llm = None
+
+
+def get_llm(model_path: str) -> Any:
+    global _llm
+    if _llm is None:
+        _llm = LLM(
+            model=model_path,
+            dtype="float16",
+            quantization="awq",
+            # gpu_memory_utilization=0.8,
+            max_model_len=16384,
+            enforce_eager=False,
+            trust_remote_code=True,
+        )
+    return _llm
+
+
+def build_prompt() -> str:
+    prompt_path = settings.llm_table_prompt
+    with open(prompt_path, "rb") as f:
+        raw_prompt = tomllib.load(f)
+
+    prompt = raw_prompt.get("prompt", {}).get("role", "") + "\n\n"
+
+    if 'rules' in raw_prompt:
+        prompt += "规则：\n"
+        for key, rule in raw_prompt["rules"].items():
+            prompt += f"{key}：{rule}\n"
+        prompt += "\n"
+
+    if 'output' in raw_prompt:
+        prompt += "输出格式：\n"
+        prompt += raw_prompt.get("title", "") + "\n"
+        prompt += raw_prompt.get("discription", "") + "\n\n"
+
+    if 'examples' in raw_prompt:
+        prompt += "示例：\n"
+        for key, example in raw_prompt["examples"].items():
+            prompt += f"例子{key} - {example.get('title', '')}\n"
+            prompt += "输入：\n"
+            prompt += example.get("input", "") + "\n"
+            prompt += "输出：\n"
+            prompt += example.get("output", "") + "\n\n"
+
+    prompt += raw_prompt.get("task", {}).get("instruction", "")
+
+    return prompt
 
 
 def safe_json_parse(text: str) -> Union[dict, list, None]:
@@ -242,7 +259,8 @@ def safe_json_parse(text: str) -> Union[dict, list, None]:
 def run_ocr(input_path):
     # 1. 主程序自己决定输出路径（比如带时间戳）
     timestamp = datetime.now().strftime(r"%Y%m%d_%H%M%S")
-    output_json_path = settings.project_root / f"data/sensitive/ocr_output/{timestamp}/"
+    output_json_path = settings.project_root / \
+        f"data/sensitive/ocr_output/{timestamp}/"
 
     # 2. 调用子进程
     result = subprocess.run(
@@ -259,8 +277,10 @@ def run_ocr(input_path):
     return output_json_path
 
 
+# 测试
 if __name__ == "__main__":
-    output_json_path = run_ocr(settings.project_root / "tests/test_ocr/cam2/4.jpg")
+    output_json_path = run_ocr(
+        settings.project_root / "tests/test_ocr/cam2/4.jpg")
 
     dates = []
     for filename in os.listdir(output_json_path):
