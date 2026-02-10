@@ -57,8 +57,11 @@ class Settings:
         # 业务参数
         self.ocr_use_gpu: bool = config.get("ocr", {}).get("use_gpu", True)
         self.ocr_gpu_id: int = config.get("ocr", {}).get("gpu_id", 0)
+
+        llm_config = config.get("llm", {})
         self.llm_table_prompt: str = str(
-            (project_root / config.get("llm", {}).get("table_prompt", "")).resolve())
+            (project_root / llm_config.get("table_prompt", "")).resolve())
+        self.llm_table_model_path: str = llm_config.get("model_path", "")
 
     def _validate_paths(self):
         """关键路径存在性校验"""
@@ -68,12 +71,12 @@ class Settings:
         if not Path(self.ocr_python).exists():
             raise FileNotFoundError(f"❌ OCR环境Python不存在: {self.ocr_python}")
 
-        if not self.ocr_script.exists():
+        if not Path(self.ocr_script).exists():
             raise FileNotFoundError(f"❌ OCR脚本不存在: {self.ocr_script}")
 
         # 自动创建必要目录
-        self.temp_dir.mkdir(parents=True, exist_ok=True)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        # self.temp_dir.mkdir(parents=True, exist_ok=True)
+        # self.log_dir.mkdir(parents=True, exist_ok=True)
 
     def get_ocr_command(self, image_path: str, output_path: str) -> list:
         """生成跨环境调用命令（llm.py中直接使用）"""

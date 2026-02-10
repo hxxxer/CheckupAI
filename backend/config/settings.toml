@@ -29,6 +29,7 @@ gpu_id = 0
 output_format = "json"  # html/markdown/json
 
 [llm]
+table_model_path = "/root/autodl-tmp/models/Qwen/Qwen3-8B-AWQ"
 table_prompt = "backend/ocr/llm_table_prompt.toml"
 max_retries = 3
 timeout_seconds = 120
