@@ -1,16 +1,10 @@
-import gc
 import json
-import re
 import os
 import subprocess
-import tomllib
 from datetime import datetime
 from bs4 import BeautifulSoup
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple, Optional, Union
-# from llama_cpp import Llama
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from vllm import LLM, SamplingParams
 from backend.config import settings
 from backend.instances import table_parser
 
