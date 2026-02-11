@@ -107,7 +107,7 @@ class TableParserLLM:
 
         # 执行推理
         llm = self._load_model()
-        outputs = llm.parse([text], sampling_params)
+        outputs = llm.generate([text], sampling_params)
         content = outputs[0].outputs[0].text
 
         # print("提取结果:", content)
