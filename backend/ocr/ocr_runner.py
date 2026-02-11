@@ -6,7 +6,7 @@ from backend.config import settings
 
 
 def process(file_path: str):
-    device = "gpu:" + settings.ocr_gpu_id if settings.ocr_use_gpu else "cpu"
+    device = "gpu:" + str(settings.ocr_gpu_id) if settings.ocr_use_gpu else "cpu"
 
     ocr_pipeline = PaddleOCRVL(
         # layout_detection_model_dir="/root/autodl-tmp/models/Paddle/PP-DocLayoutV3",
