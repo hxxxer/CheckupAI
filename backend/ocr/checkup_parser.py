@@ -62,8 +62,8 @@ def table_html_clean(table_html: str) -> str:
     escape_map = {
         r'\\uparrow ': '↑ ',      # 上箭头
         r'\\downarrow ': '↓ ',    # 下箭头
-        r'\\times ': '× ',        # 乘号
-        r'\\mu ': 'μ ',           # 删除\m
+        r'\\times ': ' × ',        # 乘号
+        r'\\mu ': 'μ',           # 删除\m
     }
 
     # 逐个替换转义字符
