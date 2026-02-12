@@ -1,4 +1,5 @@
 import json
+import re
 import tomllib
 from typing import Any, Union
 from vllm import LLM, SamplingParams
