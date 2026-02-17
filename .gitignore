@@ -36,6 +36,7 @@ env/
 *.swo
 *~
 AGENTS.md
+QWEN.md
 
 # OS
 .DS_Store
