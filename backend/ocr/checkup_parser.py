@@ -1,12 +1,12 @@
 import json
 import os
-import subprocess
 from datetime import datetime
 from bs4 import BeautifulSoup
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple, Optional, Union
 from backend.config import settings
 from backend.instances import table_parser
+from backend.ocr import PaddleOCRRunner
 
 
 def parse_ocr_result(ocr_output: list) -> Dict[str, Any]:
@@ -112,23 +112,17 @@ def table_html_to_md(table_html: str) -> str:
 
 
 def run_ocr(input_path):
-    # 1. 主程序自己决定输出路径（比如带时间戳）
-    timestamp = datetime.now().strftime(r"%Y%m%d_%H%M%S")
-    output_json_path = settings.project_root / \
-        f"data/sensitive/ocr_output/{timestamp}/"
-
-    # 2. 调用子进程
-    result = subprocess.run(
-        [settings.ocr_python, settings.ocr_script, input_path, output_json_path],
-        capture_output=True,
-        text=True
-    )
-
-    # 3. 检查是否成功
-    # if result.returncode != 0:
-    #     raise RuntimeError(f"OCR failed: {result.stderr.strip()}")
-
-    # 4. 返回 JSON 路径（主程序完全掌控）
+    """
+    执行 OCR 处理
+    
+    Args:
+        input_path: 输入图片路径
+        
+    Returns:
+        输出 JSON 目录路径
+    """
+    runner = PaddleOCRRunner()
+    output_json_path = runner.run(input_path)
     return output_json_path
 
 
