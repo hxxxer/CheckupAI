@@ -9,7 +9,7 @@ from datetime import datetime
 from paddleocr import PaddleOCRVL
 
 
-def process(file_path: str, use_gpu: bool = True, gpu_id: int = 0):
+def process(file_path: str, device: str = "cpu"):
     """
     执行 OCR 处理
     
@@ -21,7 +21,6 @@ def process(file_path: str, use_gpu: bool = True, gpu_id: int = 0):
     Returns:
         OCR 输出结果
     """
-    device = f"gpu:{gpu_id}" if use_gpu else "cpu"
     
     ocr_pipeline = PaddleOCRVL(
         device=device,
@@ -46,7 +45,8 @@ def main():
     os.makedirs(args.output, exist_ok=True)
     
     # 执行 OCR
-    output = process(args.image, use_gpu=args.gpu, gpu_id=args.gpu_id)
+    device = f"gpu:{args.gpu_id}" if args.gpu else "cpu"
+    output = process(args.image, device=device)
     
     # 保存结果
     for res in output:
