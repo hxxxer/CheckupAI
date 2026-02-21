@@ -51,6 +51,11 @@ def main():
     # 保存结果
     for res in output:
         res.save_to_json(save_path=args.output)
+        for idx, img_info in enumerate(res['imgs_in_doc']):
+            img = img_info['img']
+            save_path = os.path.join(args.output, img_info['path'])
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            img.save(save_path)
     
     print(f"保存成功，路径：{args.output}")
 
