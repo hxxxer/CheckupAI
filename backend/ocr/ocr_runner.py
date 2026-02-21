@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from backend.config import settings
 from backend.ocr import table_html_clean, table_html_to_md
+from backend.instances import table_parser
 
 
 class PaddleOCRRunner:
@@ -19,7 +20,6 @@ class PaddleOCRRunner:
         self,
         use_gpu: Optional[bool] = None,
         gpu_id: Optional[int] = None,
-        table_parser: Optional[Any] = None,
     ):
         """
         初始化 PaddleOCR 运行器
@@ -31,7 +31,6 @@ class PaddleOCRRunner:
         """
         self.use_gpu = use_gpu if use_gpu is not None else settings.ocr_use_gpu
         self.gpu_id = gpu_id if gpu_id is not None else settings.ocr_gpu_id
-        self.table_parser = table_parser
         self._script_path = os.path.join(
             os.path.dirname(__file__), "paddle_runner.py"
         )
@@ -109,19 +108,19 @@ class PaddleOCRRunner:
 
         # 处理表格
         tables_data = []
-        if self.table_parser:
-            self.table_parser.wake_up()
+        if table_parser:
+            table_parser.wake_up()
             for idx, table_block in enumerate(table_blocks):
                 try:
                     table_html = table_block.get("block_content")
                     table_html = table_html_clean(table_html)
                     table_md = table_html_to_md(table_html)
                     if table_md:
-                        tables_data.append(self.table_parser.parse(table_md))
+                        tables_data.append(table_parser.parse(table_md))
                 except Exception as e:
                     print(f"⚠️ 表格块 {idx} 解析失败：{str(e)}")
                     raise
-            self.table_parser.sleep()
+            table_parser.sleep()
 
         full_text = "\n".join([b["block_content"] for b in text_blocks])
 

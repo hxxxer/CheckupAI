@@ -1,0 +1,9 @@
+# 忽略 sensitive 下所有内容
+sensitive/**
+
+# 但保留目录结构
+!sensitive/
+!sensitive/**/
+
+# 保留占位文件
+!sensitive/**/.gitkeep

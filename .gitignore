@@ -43,7 +43,6 @@ QWEN.md
 Thumbs.db
 
 # Sensitive Data - CRITICAL
-data/sensitive/
 *.pdf
 *.jpg
 *.jpeg
