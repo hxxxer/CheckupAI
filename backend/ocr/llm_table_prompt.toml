@@ -14,7 +14,7 @@ role = "你是一个专业的医疗数据结构化助手。你的任务是从体
 - 审核医生、检验者、报告日期、送检日期等。
 """
 3 = """
-如果提取到的文本中包含箭头符号（↑ ↓ + -），将其提取到 `is_abnormal` 字段中。
+如果提取到的文本中包含箭头符号（↑ ↓ + -），将其提取到 `abnormal` 字段中。
 如果数据没有单位，`unit` 填 null。
 """
 
@@ -23,11 +23,11 @@ title = "请输出一个包含以下结构的 JSON 列表："
 discription = '''
 [
   {
-    "item_name": "检查项目名称 (如: 白细胞)",
+    "item": "检查项目名称 (如: 白细胞)",
     "result": "检查结果 (字符串，保留原始符号)",
     "unit": "单位 (如: g/L，若无则为 null)",
     "reference_range": "参考范围 (如: 3.5-9.5，若无则为null)",
-    "is_abnormal": "异常标记 (如有箭头则保留箭头字符，如 '↑'，否则为 null)"
+    "abnormal": "异常标记 (如有箭头则保留箭头字符，如 '↑'，否则为 null)"
   }
 ]
 '''
@@ -43,9 +43,9 @@ input = """
 """
 output = '''
 [
-  {"item_name": "红细胞", "result": "6", "unit": "10^12/L", "reference_range": "4.0-5.5", "is_abnormal": "↑"},
-  {"item_name": "血红蛋白", "result": "135", "unit": "g/L", "reference_range": "120-160", "is_abnormal": null},
-  {"item_name": "透明度", "result": "透明", "unit": null, "reference_range": null, "is_abnormal": null}
+  {"item": "红细胞", "result": "6", "unit": "10^12/L", "reference_range": "4.0-5.5", "abnormal": "↑"},
+  {"item": "血红蛋白", "result": "135", "unit": "g/L", "reference_range": "120-160", "abnormal": null},
+  {"item": "透明度", "result": "透明", "unit": null, "reference_range": null, "abnormal": null}
 ]
 '''
 
@@ -61,8 +61,8 @@ input = """
 """
 output = '''
 [
-  {"item_name": "蛋白质", "result": "45", "unit": "U/L", "reference_range": "0-40", "is_abnormal": "↑"},
-  {"item_name": "白细胞", "result": "28", "unit": "U/L", "reference_range": "0-40", "is_abnormal": null}
+  {"item": "蛋白质", "result": "45", "unit": "U/L", "reference_range": "0-40", "abnormal": "↑"},
+  {"item": "白细胞", "result": "28", "unit": "U/L", "reference_range": "0-40", "abnormal": null}
 ]
 '''
 
@@ -76,10 +76,10 @@ input = """
 """
 output = '''
 [
-  {"item_name": "尿胆原", "result": "阴性", "unit": null, "reference_range": "阴性", "is_abnormal": null},
-  {"item_name": "维生素C", "result": "1.2", "unit": "mmol/L", "reference_range": "0.7-2.0", "is_abnormal": null},
-  {"item_name": "葡萄糖", "result": "阴性", "unit": null, "reference_range": "阴性", "is_abnormal": null},
-  {"item_name": "酸碱度", "result": "4.2", "unit": null, "reference_range": "4.5-8.0", "is_abnormal": "↓"}
+  {"item": "尿胆原", "result": "阴性", "unit": null, "reference_range": "阴性", "abnormal": null},
+  {"item": "维生素C", "result": "1.2", "unit": "mmol/L", "reference_range": "0.7-2.0", "abnormal": null},
+  {"item": "葡萄糖", "result": "阴性", "unit": null, "reference_range": "阴性", "abnormal": null},
+  {"item": "酸碱度", "result": "4.2", "unit": null, "reference_range": "4.5-8.0", "abnormal": "↓"}
 ]
 '''
 
