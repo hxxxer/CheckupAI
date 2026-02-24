@@ -4,3 +4,4 @@ OCR 模块
 """
 from .ocr_runner import PaddleOCRRunner
 from .utils import table_html_clean, table_html_to_md
+from .schema import RawOCRResult
