@@ -77,6 +77,50 @@ class PaddleOCRRunner:
 
         return output_dir
 
+    @staticmethod
+    def load_result(output_dir: str) -> List[Dict[str, Any]]:
+        """
+        加载 OCR 输出结果
+
+        Args:
+            output_dir: 输出目录
+
+        Returns:
+            OCR 输出数据（已加载的 JSON）
+        """
+        results = []
+        
+        # 遍历所有以文件名命名的子目录
+        for file_dir in os.listdir(output_dir):
+            file_path = os.path.join(output_dir, file_dir)
+            if not os.path.isdir(file_path):
+                continue
+            
+            # 遍历所有页面索引目录
+            for page_dir in os.listdir(file_path):
+                page_path = os.path.join(file_path, page_dir)
+                if not os.path.isdir(page_path):
+                    continue
+                
+                for filename in os.listdir(page_path):
+                    if not filename.endswith('.json'):
+                        continue
+                    
+                    json_file = os.path.join(page_path, filename)
+                    
+                    if os.path.isdir(json_file):
+                        continue
+                    
+                    try:
+                        with open(json_file, 'r', encoding='utf-8') as f:
+                            results.append(json.load(f))
+                    except (json.JSONDecodeError, IOError) as e:
+                        print(f"⚠️ 加载 JSON 文件失败 {json_file}: {str(e)}")
+                        continue
+        
+        return results
+
+
     def parse_result(self, ocr_output: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         解析 OCR 输出结果，提取表格和文本
