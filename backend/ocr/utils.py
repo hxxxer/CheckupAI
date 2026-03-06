@@ -379,9 +379,59 @@ def _is_double_column(matrix: List[List[str]]) -> bool:
     return left_matches >= 2 and right_matches >= 2
 
 
+def _matrix_to_html(matrix: List[List[str]], segments: List[Dict[str, Any]]) -> str:
+    """
+    将矩阵和分段信息转换为 HTML 表格字符串（不包含 footer 行）
+
+    Args:
+        matrix: 二维矩阵
+        segments: 分段信息
+
+    Returns:
+        HTML 表格字符串
+    """
+    if not matrix:
+        return ''
+
+    html_lines = ['<table>']
+
+    for row_idx, row in enumerate(matrix):
+        seg = next((s for s in segments if s['row_index'] == row_idx), None)
+
+        if seg and seg['type'] == 'title':
+            # title 行：使用 colspan 跨越所有列
+            title_text = seg.get('text', row[0].strip() if row else '')
+            # 转义 HTML 特殊字符
+            title_text = title_text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            html_lines.append(f'<tr><td colspan="{len(row)}">{title_text}</td></tr>')
+
+        elif seg and seg['type'] == 'header':
+            # header 行：使用 th 标签
+            cells = []
+            for cell in row:
+                # 转义 HTML 特殊字符
+                cell_escaped = cell.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                cells.append(f'<th>{cell_escaped}</th>')
+            html_lines.append(f'<tr>{"".join(cells)}</tr>')
+
+        elif seg and seg['type'] == 'data':
+            # 数据行：使用 td 标签（跳过 footer）
+            cells = []
+            for cell in row:
+                # 转义 HTML 特殊字符
+                cell_escaped = cell.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                cells.append(f'<td>{cell_escaped}</td>')
+            html_lines.append(f'<tr>{"".join(cells)}</tr>')
+
+        # footer 行：跳过不输出
+
+    html_lines.append('</table>')
+    return ''.join(html_lines)
+
+
 def _matrix_to_markdown(matrix: List[List[str]], segments: List[Dict[str, Any]]) -> str:
     """
-    将矩阵和分段信息转换为 Markdown 格式
+    将矩阵和分段信息转换为 Markdown 格式（不包含 footer 行）
 
     Args:
         matrix: 二维矩阵
@@ -418,13 +468,8 @@ def _matrix_to_markdown(matrix: List[List[str]], segments: List[Dict[str, Any]])
             md_lines.append('| ' + ' | '.join(row) + ' |')
             md_lines.append('| ' + ' | '.join(['---'] * len(row)) + ' |')
 
-        elif seg and seg['type'] == 'footer':
-            # footer 行作为普通表格行
-            if header_found:
-                md_lines.append('| ' + ' | '.join(row) + ' |')
-
         elif seg and seg['type'] == 'data':
-            # 数据行
+            # 数据行（跳过 footer）
             if header_found:
                 md_lines.append('| ' + ' | '.join(row) + ' |')
             elif row_idx == 0 and not header_found:
@@ -438,7 +483,7 @@ def _matrix_to_markdown(matrix: List[List[str]], segments: List[Dict[str, Any]])
 
 def table_html_to_md(table_html: str) -> Optional[Dict[str, Any]]:
     """
-    将 HTML 表格转换为结构化数据和 Markdown 格式
+    将 HTML 表格转换为结构化数据和 Markdown/HTML 格式
 
     Args:
         table_html: HTML 表格字符串
@@ -450,7 +495,8 @@ def table_html_to_md(table_html: str) -> Optional[Dict[str, Any]]:
           - matrix: 二维矩阵
           - segments: 分段信息
           - is_double_column: 是否双栏
-          - markdown: Markdown 字符串
+          - markdown: Markdown 字符串（不含 footer 行）
+          - html: HTML 表格字符串（不含 footer 行）
 
         如果解析失败返回 None
     """
@@ -481,7 +527,8 @@ def table_html_to_md(table_html: str) -> Optional[Dict[str, Any]]:
             'matrix': sub_matrix,
             'segments': sub_segments,
             'is_double_column': _is_double_column(sub_matrix),
-            'markdown': _matrix_to_markdown(sub_matrix, sub_segments)
+            'markdown': _matrix_to_markdown(sub_matrix, sub_segments),
+            'html': _matrix_to_html(sub_matrix, sub_segments)
         })
 
     return {
