@@ -164,6 +164,91 @@ def test_rowspan_colspan():
     return True
 
 
+def test_title_without_plus():
+    """测试 title 行不带 '+' 的情况（如 '血常规'）"""
+    html = '''
+    <table>
+    <tr>
+        <td colspan="4">血常规</td>
+    </tr>
+    <tr>
+        <td>项目名称</td><td>检查结果</td><td>参考值</td><td>单位</td>
+    </tr>
+    <tr>
+        <td>白细胞</td><td>5.2</td><td>3.5-9.5</td><td>10^9/L</td>
+    </tr>
+    <tr>
+        <td>红细胞</td><td>4.8</td><td>4.0-5.5</td><td>10^12/L</td>
+    </tr>
+    </table>
+    '''
+
+    result = table_html_to_md(html)
+
+    print("\n=== 测试：title 不带 '+'（血常规）===")
+    assert result is not None
+    assert result['table_count'] == 1
+
+    table = result['tables'][0]
+    segments = table['segments']
+    print(f"分段：{segments}")
+
+    # 应该识别出 title 行
+    title_seg = next((s for s in segments if s['type'] == 'title'), None)
+    assert title_seg is not None, "应该识别出 title 行"
+    assert title_seg['text'] == '血常规'
+    print(f"title: {title_seg['text']}")
+
+    # 验证 Markdown 输出包含 title
+    md = table['markdown']
+    print(f"Markdown: {md}")
+    assert '**血常规**' in md
+
+    print("[PASS]\n")
+    return True
+
+
+def test_title_at_first_row():
+    """测试第一行即为 title 行的情况"""
+    html = '''
+    <table>
+    <tr>
+        <td colspan="3">肝功能</td>
+    </tr>
+    <tr>
+        <td>项目名称</td><td>结果</td><td>参考值</td>
+    </tr>
+    <tr>
+        <td>ALT</td><td>25</td><td>0-40</td>
+    </tr>
+    </table>
+    '''
+
+    result = table_html_to_md(html)
+
+    print("\n=== 测试：第一行即为 title 行 ===")
+    assert result is not None
+    assert result['table_count'] == 1
+
+    table = result['tables'][0]
+    segments = table['segments']
+    print(f"分段：{segments}")
+
+    # 应该识别出 title 行在第一行
+    title_seg = next((s for s in segments if s['type'] == 'title'), None)
+    assert title_seg is not None, "应该识别出 title 行"
+    assert title_seg['row_index'] == 0, "title 行应该在第一行"
+    print(f"title: {title_seg['text']}, row_index: {title_seg['row_index']}")
+
+    # 验证 Markdown 输出
+    md = table['markdown']
+    print(f"Markdown: {md}")
+    assert '**肝功能**' in md
+
+    print("[PASS]\n")
+    return True
+
+
 def test_footer_row():
     """测试 footer 行识别"""
     html = '''
@@ -261,6 +346,8 @@ if __name__ == '__main__':
         ("双栏布局 + 连体表格拆分", test_double_column_with_split),
         ("简单单栏表格", test_simple_table),
         ("rowspan/colspan", test_rowspan_colspan),
+        ("title 不带 '+'", test_title_without_plus),
+        ("第一行 title", test_title_at_first_row),
         ("footer 行识别", test_footer_row),
         ("HTML 实体解码", test_html_entities),
         ("空输入", test_empty_input),
