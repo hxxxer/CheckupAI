@@ -39,12 +39,12 @@ class TableItem:
     """表格中的单条检验项目。"""
 
     # --- 必填：原始字符串，保留原文，方便拼接展示 ---
-    name: str  # 项目名称，如"血红蛋白"
+    item: str  # 项目名称，如"血红蛋白"
     result: str  # 结果值，如"135"
 
     # --- 原始字符串（可选）---
     unit: str = ""  # 单位，如"g/L"
-    flag: str = ""  # 原始异常标志字符，如"↑"、"H"
+    abnormal: str = ""  # 原始异常标志字符，如"↑"、"H"
     reference_range: str = ""  # 原始参考值字符串，如"115-150"
 
 
@@ -75,7 +75,7 @@ class Image:
 class RawPage:
     """单页的 OCR 原始输出。"""
 
-    page_number: int  # 1-based
+    page_index: int  # 0-based
     image_width: int  # 页面图像宽度（像素）
     image_height: int  # 页面图像高度（像素）
 
