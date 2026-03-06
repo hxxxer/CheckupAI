@@ -79,7 +79,7 @@ class TableParserLLM:
 
         return self._prompt
 
-    def parse(self, table_data: dict) -> Union[dict, list, None]:
+    def parse(self, table_data: dict) -> Union[list, None]:
         """
         使用 LLM 解析表格数据并解析为 JSON
         :param table_data: table_html_to_md 返回的结构化数据，包含：
