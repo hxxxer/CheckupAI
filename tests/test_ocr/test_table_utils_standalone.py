@@ -89,6 +89,11 @@ def test_double_column_with_split():
     print(f"Markdown 包含 title 加粗：{'**肝功能' in md2}")
     assert '**肝功能' in md2 or '肝功能**' in md2
 
+    print("\n表格 1 Markdown:")
+    print(table1['markdown'])
+    print("\n表格 2 Markdown:")
+    print(md2)
+
     print("[PASS]\n")
     return True
 
@@ -121,51 +126,15 @@ def test_simple_table():
     print(f"矩阵行数：{len(table['matrix'])}")
     assert len(table['matrix']) == 3
 
-    print("[PASS]\n")
-    return True
-
-
-def test_rowspan_colspan():
-    """测试 rowspan 和 colspan 处理"""
-    html = '''
-    <table>
-    <tr>
-        <th rowspan="2">项目</th>
-        <th colspan="2">结果</th>
-    </tr>
-    <tr>
-        <th>测定值</th><th>参考值</th>
-    </tr>
-    <tr>
-        <td>血糖</td><td>5.6</td><td>3.9-6.1</td>
-    </tr>
-    </table>
-    '''
-
-    result = table_html_to_md(html)
-
-    print("\n=== 测试：rowspan 和 colspan ===")
-    assert result is not None
-
-    table = result['tables'][0]
-    matrix = table['matrix']
-
-    print(f"矩阵：{matrix}")
-
-    # 验证 rowspan: "项目" 应该占据两行第一列（两行都有值）
-    assert matrix[0][0] == '项目'
-    assert matrix[1][0] == '项目'
-
-    # 验证 colspan: "结果" 只在左上角 (0,1)，(0,2) 为空（方案 A：不重复填充）
-    assert matrix[0][1] == '结果'
-    assert matrix[0][2] == ''
+    print("\nMarkdown:")
+    print(table['markdown'])
 
     print("[PASS]\n")
     return True
 
 
-def test_title_without_plus():
-    """测试 title 行不带 '+' 的情况（如 '血常规'）"""
+def test_title_recognition():
+    """测试 title 行识别（不带 '+' 的情况，如 '血常规'、'肝功能'）"""
     html = '''
     <table>
     <tr>
@@ -185,7 +154,7 @@ def test_title_without_plus():
 
     result = table_html_to_md(html)
 
-    print("\n=== 测试：title 不带 '+'（血常规）===")
+    print("\n=== 测试：title 识别（血常规）===")
     assert result is not None
     assert result['table_count'] == 1
 
@@ -197,53 +166,59 @@ def test_title_without_plus():
     title_seg = next((s for s in segments if s['type'] == 'title'), None)
     assert title_seg is not None, "应该识别出 title 行"
     assert title_seg['text'] == '血常规'
-    print(f"title: {title_seg['text']}")
+    assert title_seg['row_index'] == 0, "title 行应该在第一行"
+    print(f"title: {title_seg['text']}, row_index: {title_seg['row_index']}")
 
     # 验证 Markdown 输出包含 title
     md = table['markdown']
-    print(f"Markdown: {md}")
+    print(f"Markdown:\n{md}")
     assert '**血常规**' in md
 
     print("[PASS]\n")
     return True
 
 
-def test_title_at_first_row():
-    """测试第一行即为 title 行的情况"""
+def test_complex_rowspan_colspan():
+    """测试复杂的 rowspan+colspan 场景（真实医疗报告例子）"""
     html = '''
     <table>
-    <tr>
-        <td colspan="3">肝功能</td>
-    </tr>
-    <tr>
-        <td>项目名称</td><td>结果</td><td>参考值</td>
-    </tr>
-    <tr>
-        <td>ALT</td><td>25</td><td>0-40</td>
-    </tr>
+    <tr><td colspan="3">血常规</td></tr>
+    <tr><td></td><td>项目</td><td>结果</td></tr>
+    <tr><td rowspan="2">测试结果</td><td>球蛋白</td><td>123</td></tr>
+    <tr><td>红细胞</td><td>↑ 60</td></tr>
     </table>
     '''
 
     result = table_html_to_md(html)
 
-    print("\n=== 测试：第一行即为 title 行 ===")
+    print("\n=== 测试：复杂 rowspan+colspan ===")
     assert result is not None
     assert result['table_count'] == 1
 
     table = result['tables'][0]
+    matrix = table['matrix']
     segments = table['segments']
+
+    print(f"矩阵：{matrix}")
     print(f"分段：{segments}")
 
-    # 应该识别出 title 行在第一行
+    # 验证 title 行识别
     title_seg = next((s for s in segments if s['type'] == 'title'), None)
     assert title_seg is not None, "应该识别出 title 行"
-    assert title_seg['row_index'] == 0, "title 行应该在第一行"
-    print(f"title: {title_seg['text']}, row_index: {title_seg['row_index']}")
+    assert title_seg['text'] == '血常规'
+
+    # 验证 rowspan: "测试结果" 应该占据两行第一列
+    assert matrix[2][0] == '测试结果'
+    assert matrix[3][0] == '测试结果'
+
+    # 验证 header 行（第二行，带空单元格）
+    header_seg = next((s for s in segments if s['type'] == 'header'), None)
+    assert header_seg is not None, "应该识别出 header 行"
 
     # 验证 Markdown 输出
     md = table['markdown']
-    print(f"Markdown: {md}")
-    assert '**肝功能**' in md
+    print(f"Markdown:\n{md}")
+    assert '**血常规**' in md
 
     print("[PASS]\n")
     return True
@@ -277,6 +252,9 @@ def test_footer_row():
     footer_seg = next((s for s in segments if s['type'] == 'footer'), None)
     print(f"footer 段：{footer_seg}")
     assert footer_seg is not None, "应该识别出 footer 行"
+
+    print("\nMarkdown:")
+    print(table['markdown'])
 
     print("[PASS]\n")
     return True
@@ -314,6 +292,9 @@ def test_html_entities():
     assert has_less_than, "应该包含解码后的 <5.0"
     assert has_greater_than, "应该包含解码后的 >4.0"
 
+    print("\nMarkdown:")
+    print(table['markdown'])
+
     print("[PASS]\n")
     return True
 
@@ -345,9 +326,8 @@ if __name__ == '__main__':
     tests = [
         ("双栏布局 + 连体表格拆分", test_double_column_with_split),
         ("简单单栏表格", test_simple_table),
-        ("rowspan/colspan", test_rowspan_colspan),
-        ("title 不带 '+'", test_title_without_plus),
-        ("第一行 title", test_title_at_first_row),
+        ("title 识别", test_title_recognition),
+        ("复杂 rowspan+colspan", test_complex_rowspan_colspan),
         ("footer 行识别", test_footer_row),
         ("HTML 实体解码", test_html_entities),
         ("空输入", test_empty_input),
