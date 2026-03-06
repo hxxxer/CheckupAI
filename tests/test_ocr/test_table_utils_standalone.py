@@ -91,8 +91,18 @@ def test_double_column_with_split():
 
     print("\n表格 1 Markdown:")
     print(table1['markdown'])
+    print("\n表格 1 HTML:")
+    print(table1['html'])
     print("\n表格 2 Markdown:")
     print(md2)
+    print("\n表格 2 HTML:")
+    print(table2['html'])
+
+    # 验证 HTML 输出
+    assert '<table>' in table1['html']
+    assert '</table>' in table1['html']
+    assert '<th>' in table1['html']  # 包含 header
+    assert '<td>' in table1['html']  # 包含数据
 
     print("[PASS]\n")
     return True
@@ -128,6 +138,12 @@ def test_simple_table():
 
     print("\nMarkdown:")
     print(table['markdown'])
+    print("\nHTML:")
+    print(table['html'])
+
+    # 验证 HTML 输出
+    assert '<table>' in table['html']
+    assert '</table>' in table['html']
 
     print("[PASS]\n")
     return True
@@ -173,6 +189,11 @@ def test_title_recognition():
     md = table['markdown']
     print(f"Markdown:\n{md}")
     assert '**血常规**' in md
+
+    print("\nHTML:")
+    print(table['html'])
+    assert '<table>' in table['html']
+    assert '</table>' in table['html']
 
     print("[PASS]\n")
     return True
@@ -220,6 +241,13 @@ def test_complex_rowspan_colspan():
     print(f"Markdown:\n{md}")
     assert '**血常规**' in md
 
+    print("\nHTML:")
+    print(table['html'])
+    assert '<table>' in table['html']
+    assert '</table>' in table['html']
+    # 验证不包含 footer 行
+    assert '检验者' not in table['html']
+
     print("[PASS]\n")
     return True
 
@@ -255,6 +283,12 @@ def test_footer_row():
 
     print("\nMarkdown:")
     print(table['markdown'])
+    print("\nHTML:")
+    print(table['html'])
+
+    # 验证 Markdown 和 HTML 都不包含 footer 行内容
+    assert '检验者' not in table['markdown']
+    assert '检验者' not in table['html']
 
     print("[PASS]\n")
     return True
@@ -294,6 +328,11 @@ def test_html_entities():
 
     print("\nMarkdown:")
     print(table['markdown'])
+    print("\nHTML:")
+    print(table['html'])
+
+    # 验证 HTML 输出包含转义后的字符
+    assert '&lt;5.0' in table['html']
 
     print("[PASS]\n")
     return True
