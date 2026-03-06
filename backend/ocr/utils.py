@@ -147,7 +147,7 @@ def _is_footer_row(row: List[str]) -> bool:
 
 def _is_colspan_separator_row(row: List[str], matrix_row_idx: int, matrix: List[List[str]]) -> bool:
     """
-    判断某行是否为 colspan 分隔行（用于分隔两个表格）
+    判断某行是否为 colspan 分隔行（title 行）
 
     Args:
         row: 行数据列表
@@ -156,22 +156,36 @@ def _is_colspan_separator_row(row: List[str], matrix_row_idx: int, matrix: List[
 
     Returns:
         是否为分隔行
+
+    判断依据（优先级从高到低）：
+    1. 结构特征：只有一个非空单元格（colspan 展开后）
+    2. 上下文特征：下一行是 header 行（强特征）
+    3. 内容特征：包含医疗检查类别关键词
     """
-    # 方案 A：colspan 不再重复填充，只需检查第一个非空单元格
     non_empty = [cell for cell in row if cell.strip()]
-    if not non_empty:
+
+    # 结构特征：应该只有一个非空单元格（colspan 展开后）
+    if len(non_empty) != 1:
         return False
 
-    # colspan 分隔行特征：只有一个非空单元格（左上角），且包含 "+" 或分隔关键词
     separator_text = non_empty[0]
-    
-    # 分隔行通常包含 "+" 连接多个检查类别
-    if '+' in separator_text:
-        return True
 
-    # 或者是常见的分隔语义
-    separator_keywords = ['合计', '总计', '以上为', '以下为', '---']
-    return any(kw in separator_text for kw in separator_keywords)
+    # 上下文特征：检查下一行是否为 header 行（强特征）
+    next_row_idx = matrix_row_idx + 1
+    if next_row_idx < len(matrix):
+        next_row = matrix[next_row_idx]
+        if _is_header_row(next_row):
+            # 下一行是 header，当前行很可能是 title
+            # 排除明显不是 title 的情况（如 footer 行）
+            if not _is_footer_row(row):
+                return True
+
+    # 内容特征：包含医疗检查类别关键词（辅助判断）
+    title_keywords = ['血常规', '尿常规', '肝功能', '肾功能', '血糖', '血脂',
+                      '心电图', '胸片', 'CT', 'B 超', '肿瘤标志物',
+                      '激素', '免疫', '凝血', '生化', '肝炎', '乙肝',
+                      '甲功', '糖化', '离子', '心肌酶', '贫血']
+    return any(kw in separator_text for kw in title_keywords)
 
 
 def _detect_segments(matrix: List[List[str]]) -> List[Dict[str, Any]]:
