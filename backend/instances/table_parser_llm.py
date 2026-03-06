@@ -73,48 +73,78 @@ class TableParserLLM:
 
         return self._prompt
 
-    def parse(self, table_md: str) -> Union[dict, list, None]:
+    def parse(self, table_data: dict) -> Union[dict, list, None]:
         """
-        使用LLM生成结果并解析为JSON
-        :param table_md: Markdown格式的表格数据
+        使用 LLM 解析表格数据并解析为 JSON
+        :param table_data: table_html_to_md 返回的结构化数据，包含：
+            - table_count: 表格数量
+            - tables: 表格列表，每个表格包含：
+              - matrix: 二维矩阵
+              - segments: 分段信息
+              - is_double_column: 是否双栏
+              - markdown: Markdown 字符串
+              - html: HTML 字符串
+              - context: 第一个表格前的上下文文本（可选）
         :return: 解析后的JSON结果
         """
+        if not table_data or not table_data.get("tables"):
+            return []
+        
         # 加载模型和Tokenizer
         tokenizer = self._load_tokenizer()
 
         # 构建Prompt
         prompt = self._build_prompt()
 
-        # 构造消息
-        messages = [
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": table_md}
-        ]
-        text = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=False
-        )
+        results = []
 
-        # 推理参数
-        sampling_params = SamplingParams(
-            temperature=0.7,
-            top_k=20,
-            top_p=0.8,
-            max_tokens=8192,
-            stop=["<|im_end|>", "<|endoftext|>"]  # 设置停止词
-        )
+        for table in table_data["tables"]:
+            context = table.get("context", "")
+            context = f"【表格上方原始文本】:\n{context}\n\n" if context else ""
 
-        # 执行推理
-        llm = self._load_model()
-        outputs = llm.generate([text], sampling_params)
-        content = outputs[0].outputs[0].text
+            md_content = table["markdown"]
+            html_content = table["html"]
+
+            user_content = (
+                f"{context}"
+                f"【Markdown】:\n{md_content}\n\n"
+                # f"【HTML源码】:\n{html_content}"
+            )
+
+            # 构造消息
+            messages = [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user_content}
+            ]
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False
+            )
+
+            # 推理参数
+            sampling_params = SamplingParams(
+                temperature=0.7,
+                top_k=20,
+                top_p=0.8,
+                max_tokens=8192,
+                stop=["<|im_end|>", "<|endoftext|>"]  # 设置停止词
+            )
+
+            # 执行推理
+            llm = self._load_model()
+            outputs = llm.generate([text], sampling_params)
+
+            content = outputs[0].outputs[0].text
+            parsed_result = self.safe_json_parse(content)
+
+            # 安全解析JSON
+            results.append(parsed_result)
 
         # print("提取结果:", content)
 
-        # 安全解析JSON
-        return self.safe_json_parse(content)
+        return results
 
     def sleep(self):
         if self._llm is not None:
