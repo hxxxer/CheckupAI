@@ -8,7 +8,7 @@ OCR 模块
 
 # 轻依赖，直接导入
 from .utils import table_html_clean, table_html_to_md
-from .schema import RawOCRResult
+from .schema import *
 
 
 def __getattr__(name):
