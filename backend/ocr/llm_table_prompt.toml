@@ -3,55 +3,72 @@
 # ========================================
 
 [prompt]
-role = "你是一个专业的医疗数据结构化助手。你的任务是从体检报告的 OCR 识别结果（Markdown 格式）中提取关键指标，并将其转换为标准的 JSON 格式。"
-
+role = "你是一个专业的医疗数据结构化助手。任务是从体检报告的 OCR 文本（Markdown，可能附带HTML）中提取关键指标，转换为标准 JSON。"
 [rules]
-1 = "严格输出 JSON：只返回 JSON 代码块，不要包含任何解释性文字、Markdown 标记（如 ```json）等内容。"
-2 = """
-请忽略所有非检查数据的信息，包括但不限于：
-- 报告标题、医院名称、体检号、条形码。
-- 页眉、页码、打印时间。
-- 审核医生、检验者、报告日期、送检日期等。
-"""
+1 = "严格输出 JSON：只返回 JSON 代码，不要包含任何解释性文字、Markdown 标记（如 ```json）等内容。"
+2 = "噪音过滤：忽略所有非检测数据，包括：医院名称、体检号、条码、页眉页脚、医生签名、日期等。"
 3 = """
-如果提取到的文本中包含箭头符号（↑ ↓ + -），将其提取到 `abnormal` 字段中。
-如果数据没有单位，`unit` 填 null。
+数据清洗与拆分：
+如果提取到的文本中包含箭头符号（↑ ↓ + -），将其分离提取到 `abnormal` 字段中，'result' 等其它字段仅保留纯净的数值或文本。
+若 '单位' 或 '参考范围' 为空、横杠 (-) 或 '无'，且无法从同行的其它栏中提取，填 null。
+若遇到双栏或多栏布局，必须将其展平为单一的行列表。
 """
+4 = "特殊字符处理：保留数值中的小数点和科学计数法 (如 10^12)，不要进行数值计算或单位换算。"
 
 [output]
-title = "请输出一个包含以下结构的 JSON 列表："
-discription = '''
-[
-  {
-    "item": "检查项目名称 (如: 白细胞)",
-    "result": "检查结果 (字符串，保留原始符号)",
-    "unit": "单位 (如: g/L，若无则为 null)",
-    "reference_range": "参考范围 (如: 3.5-9.5，若无则为null)",
-    "abnormal": "异常标记 (如有箭头则保留箭头字符，如 '↑'，否则为 null)"
-  }
-]
+title = "请输出一个包含以下结构的 JSON 对象："
+description = '''
+{
+  "title": "表格标题（如：血常规、肝功能等，若无标题则为 null）",
+  "table": [
+    {
+      "item": "检查项目名称 (如：白细胞)",
+      "result": "检查结果 (字符串，保留原始符号)",
+      "unit": "单位 (如：g/L，若无则为 null)",
+      "reference_range": "参考范围 (如：3.5-9.5，若无则为 null)",
+      "abnormal": "异常标记 (如有箭头则保留箭头字符，如 '↑'，否则为 null)"
+    }
+  ]
+}
 '''
 
 [examples.1]
 title = "标准单栏表格，包括大部分正常情况"
 input = """
+【Markdown】:
+**血常规**
+
 | 项目名称 | 检查结果 | 单位 | 参考范围 |
 |---|---|---|---|
 | 红细胞 | ↑ 6 | 10^12/L | 4.0-5.5 |
 | 血红蛋白 | 135 | g/L | 120-160 |
 | 透明度 | 透明 |  |  |
 """
+extra_input = '''
+【HTML源码】:
+<table><tr><td colspan="4">血常规</td></tr><tr><th>项目名称</th><th>检查结果</th><th>单位</th><th>参考范围</th></tr><tr><td>红细胞</td><td>↑ 6</td><td>10^12/L</td><td>4.0-5.5</td></tr><tr><td>血红蛋白</td><td>135</td><td>g/L</td><td>120-160</td></tr><tr><td>透明度</td><td>透明</td><td></td><td></td></tr></table>
+'''
 output = '''
-[
-  {"item": "红细胞", "result": "6", "unit": "10^12/L", "reference_range": "4.0-5.5", "abnormal": "↑"},
-  {"item": "血红蛋白", "result": "135", "unit": "g/L", "reference_range": "120-160", "abnormal": null},
-  {"item": "透明度", "result": "透明", "unit": null, "reference_range": null, "abnormal": null}
-]
+{
+  "title": "血常规",
+  "table": [
+    {"item": "红细胞", "result": "6", "unit": "10^12/L", "reference_range": "4.0-5.5", "abnormal": "↑"},
+    {"item": "血红蛋白", "result": "135", "unit": "g/L", "reference_range": "120-160", "abnormal": null},
+    {"item": "透明度", "result": "透明", "unit": null, "reference_range": null, "abnormal": null}
+  ]
+}
 '''
 
 [examples.2]
-title = "包含噪音的脏数据"
+title = "包含噪音且标题在【表格上方原始文本】里的脏数据"
 input = """
+【表格上方原始文本】:
+尿常规
+昆山中医院检验报告单
+样本类型：尿液
+临床诊断：
+
+【Markdown】:
 | 项目名称 | 检查结果 | 单位 | 参考范围 |
 |---|---|---|---|
 | 蛋白质 | ↑ 45 | U/L | 0-40 |
@@ -60,27 +77,40 @@ input = """
 | 第 1 页 / 共 2 页 |  |  |  |
 """
 output = '''
-[
-  {"item": "蛋白质", "result": "45", "unit": "U/L", "reference_range": "0-40", "abnormal": "↑"},
-  {"item": "白细胞", "result": "28", "unit": "U/L", "reference_range": "0-40", "abnormal": null}
-]
+{
+  "title": "尿常规”,
+  "table": [
+    {"item": "蛋白质", "result": "45", "unit": "U/L", "reference_range": "0-40", "abnormal": "↑"},
+    {"item": "白细胞", "result": "28", "unit": "U/L", "reference_range": "0-40", "abnormal": null}
+  ]
+}
 '''
 
 [examples.3]
-title = "双栏表格"
+title = "双栏表格且【表格上方原始文本】里全为噪音，同时 '单位' 格的内容被ocr识别合并到 '参考值' 格内"
 input = """
+【表格上方原始文本】:
+检测结果
+本报告仅对所检测样本负责
+
+【Markdown】:
+**肝功能**
+
 | 项目名称 | 检查结果 | 单位 | 参考值 | 项目名称 | 检查结果 | 单位 | 参考值 |
 |  ---  |  ---  |  ---  |  ---  |  ---  |  ---  |  ---  |  ---  |
-| 尿胆原 | 阴性 |  | 阴性 | 维生素C | 1.2 | mmol/L | 0.7-2.0 |
+| 尿胆原 | 阴性 |  | 阴性 | 维生素C | 1.2 |  | mmol/L 0.7-2.0 |
 | 葡萄糖 | 阴性 |  | 阴性 | 酸碱度 | ↓ 4.2 |  | 4.5-8.0 |
 """
 output = '''
-[
-  {"item": "尿胆原", "result": "阴性", "unit": null, "reference_range": "阴性", "abnormal": null},
-  {"item": "维生素C", "result": "1.2", "unit": "mmol/L", "reference_range": "0.7-2.0", "abnormal": null},
-  {"item": "葡萄糖", "result": "阴性", "unit": null, "reference_range": "阴性", "abnormal": null},
-  {"item": "酸碱度", "result": "4.2", "unit": null, "reference_range": "4.5-8.0", "abnormal": "↓"}
-]
+ {
+  "title": "肝功能",
+  "table": [
+    {"item": "尿胆原", "result": "阴性", "unit": null, "reference_range": "阴性", "abnormal": null},
+    {"item": "维生素 C", "result": "1.2", "unit": "mmol/L", "reference_range": "0.7-2.0", "abnormal": null},
+    {"item": "葡萄糖", "result": "阴性", "unit": null, "reference_range": "阴性", "abnormal": null},
+    {"item": "酸碱度", "result": "4.2", "unit": null, "reference_range": "4.5-8.0", "abnormal": "↓"}
+  ]
+}
 '''
 
 [task]
