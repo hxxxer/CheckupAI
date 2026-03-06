@@ -43,8 +43,13 @@ class TableParserLLM:
     def _build_prompt(self) -> str:
         """构建Prompt"""
         if self._prompt is None:
-            with open(self.prompt_path, "rb") as f:
-                raw_prompt = tomllib.load(f)
+            try:
+                with open(self.prompt_path, "rb") as f:
+                    raw_prompt = tomllib.load(f)
+            except FileNotFoundError:
+                raise FileNotFoundError(f"提取表格Prompt文件缺失: {self.prompt_path}")
+            except tomllib.TOMLDecodeError as e:
+                raise ValueError(f"TOML文件格式不合法: {self.prompt_path}: {e}")
 
             prompt = raw_prompt.get("prompt", {}).get("role", "") + "\n\n"
 
@@ -57,10 +62,10 @@ class TableParserLLM:
             if 'output' in raw_prompt:
                 prompt += "输出格式：\n"
                 prompt += raw_prompt.get("title", "") + "\n"
-                prompt += raw_prompt.get("discription", "") + "\n\n"
+                prompt += raw_prompt.get("description", "") + "\n\n"
 
             if 'examples' in raw_prompt:
-                prompt += "示例：\n"
+                prompt += "以下为若干个示例，涵盖绝大部分特殊情况处理方式：\n"
                 for key, example in raw_prompt["examples"].items():
                     prompt += f"例子{key} - {example.get('title', '')}\n"
                     prompt += "输入：\n"
@@ -69,6 +74,7 @@ class TableParserLLM:
                     prompt += example.get("output", "") + "\n\n"
 
             prompt += raw_prompt.get("task", {}).get("instruction", "")
+            prompt += "\n\n"
             self._prompt = prompt
 
         return self._prompt
