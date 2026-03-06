@@ -82,10 +82,15 @@ def _build_matrix(table: Tag) -> List[List[str]]:
             colspan = int(cell.get('colspan', 1))
             text = html.unescape(cell.get_text(strip=True))
 
-            # 填充矩阵
+            # 方案 A：rowspan 向下重复填充，colspan 不向右填充
+            # rowspan 需要填充：因为每行都需要这个值
+            # colspan 不填充：因为内容只在左侧显示
+            for r in range(row_idx, min(row_idx + rowspan, len(rows))):
+                matrix[r][col_idx] = text
+
+            # 标记所有被占据的位置为 occupied（包括自身）
             for r in range(row_idx, min(row_idx + rowspan, len(rows))):
                 for c in range(col_idx, min(col_idx + colspan, max_cols)):
-                    matrix[r][c] = text
                     occupied[r][c] = True
 
             col_idx += colspan
@@ -117,6 +122,7 @@ def _is_header_row(row: List[str]) -> bool:
 def _is_footer_row(row: List[str]) -> bool:
     """
     判断某行是否为 footer 行（检验者、审核者等）
+    使用两部分组合匹配：(动作/角色词) + (后缀词)
 
     Args:
         row: 行数据列表
@@ -124,9 +130,19 @@ def _is_footer_row(row: List[str]) -> bool:
     Returns:
         是否为 footer 行
     """
-    footer_keywords = ['检验者', '审核者', '审核日期', '报告日期', '医师', '检查者']
+    # 第一部分：动作/角色词
+    action_keywords = ['检验', '检查', '审核', '报告', '核对', '医师', '医生']
+    
+    # 第二部分：后缀词
+    suffix_keywords = ['者', '医生', '日期', '时间']
+    
     row_text = ''.join(row)
-    return any(kw in row_text for kw in footer_keywords)
+    
+    # 检查是否同时包含两部分关键词（组合匹配）
+    has_action = any(kw in row_text for kw in action_keywords)
+    has_suffix = any(kw in row_text for kw in suffix_keywords)
+    
+    return has_action and has_suffix
 
 
 def _is_colspan_separator_row(row: List[str], matrix_row_idx: int, matrix: List[List[str]]) -> bool:
@@ -141,23 +157,21 @@ def _is_colspan_separator_row(row: List[str], matrix_row_idx: int, matrix: List[
     Returns:
         是否为分隔行
     """
-    # 检查是否所有非空单元格都是相同的内容（colspan 展开后）
+    # 方案 A：colspan 不再重复填充，只需检查第一个非空单元格
     non_empty = [cell for cell in row if cell.strip()]
     if not non_empty:
         return False
+
+    # colspan 分隔行特征：只有一个非空单元格（左上角），且包含 "+" 或分隔关键词
+    separator_text = non_empty[0]
     
-    # 如果所有非空单元格内容相同，且包含 "+" 或分隔关键词
-    first_cell = non_empty[0]
-    if all(cell == first_cell for cell in non_empty):
-        # 分隔行通常包含 "+" 连接多个检查类别
-        if '+' in first_cell:
-            return True
-        
-        # 或者是常见的分隔语义
-        separator_keywords = ['合计', '总计', '以上为', '以下为', '---']
-        return any(kw in first_cell for kw in separator_keywords)
-    
-    return False
+    # 分隔行通常包含 "+" 连接多个检查类别
+    if '+' in separator_text:
+        return True
+
+    # 或者是常见的分隔语义
+    separator_keywords = ['合计', '总计', '以上为', '以下为', '---']
+    return any(kw in separator_text for kw in separator_keywords)
 
 
 def _detect_segments(matrix: List[List[str]]) -> List[Dict[str, Any]]:

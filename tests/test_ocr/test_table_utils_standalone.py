@@ -151,14 +151,14 @@ def test_rowspan_colspan():
     matrix = table['matrix']
 
     print(f"矩阵：{matrix}")
-    
-    # 验证 rowspan: "项目" 应该占据两行第一列
+
+    # 验证 rowspan: "项目" 应该占据两行第一列（两行都有值）
     assert matrix[0][0] == '项目'
     assert matrix[1][0] == '项目'
 
-    # 验证 colspan: "结果" 应该占据两列
+    # 验证 colspan: "结果" 只在左上角 (0,1)，(0,2) 为空（方案 A：不重复填充）
     assert matrix[0][1] == '结果'
-    assert matrix[0][2] == '结果'
+    assert matrix[0][2] == ''
 
     print("[PASS]\n")
     return True
