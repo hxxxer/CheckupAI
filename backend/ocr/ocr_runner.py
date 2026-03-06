@@ -5,6 +5,7 @@ OCR Runner Module
 
 import json
 import os
+import re
 import subprocess
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -141,14 +142,24 @@ class PaddleOCRRunner:
         text_blocks = []
         table_blocks = []
         image_blocks = []
+        context_before_table = []  # 第一个 table 之前的 text blocks
+        first_table_found = False
+
         for block in blocks:
             label = block.get("block_label")
             if label == "text":
                 text_blocks.append(block)
+                # 在遇到第一个 table 之前，累积 text 到 context
+                if not first_table_found:
+                    context_before_table.append(block)
             elif label == "table":
+                first_table_found = True
                 table_blocks.append(block)
             elif label == "image":
                 image_blocks.append(block)
+
+        # 过滤 context 内容，提取可能有用的表格标题信息
+        context_text = self._filter_context_text(context_before_table)
 
         # 处理表格
         tables_data = []
@@ -160,7 +171,11 @@ class PaddleOCRRunner:
                     table_html = table_html_clean(table_html)
                     table_md = table_html_to_md(table_html)
                     if table_md:
-                        tables_data.append(table_parser.parse(table_md))
+                        table_data = table_parser.parse(table_md)
+                        # 只给第一个表格添加上下文
+                        if context_text and idx == 0:
+                            table_data['tables'][0]['context'] = context_text
+                        tables_data.append()
                 except Exception as e:
                     print(f"⚠️ 表格块 {idx} 解析失败：{str(e)}")
                     raise
@@ -177,3 +192,64 @@ class PaddleOCRRunner:
                 "text_blocks": len(text_blocks),
             }
         }
+
+    @staticmethod
+    def _filter_context_text(blocks: List[Dict[str, Any]]) -> str:
+        """
+        过滤掉无关的个人信息，保留可能作为表格标题的内容
+
+        排除：姓名、性别、年龄、门诊号、No.、体检号等
+        保留：短文本、医疗检查关键词（血常规、肝功能等）
+
+        Args:
+            blocks: text blocks 列表
+
+        Returns:
+            过滤后的文本字符串
+        """
+        # 排除模式（正则）
+        exclude_patterns = [
+            r'姓名 [：:\s]',
+            r'性别 [：:\s]',
+            r'年龄 [：:\s]',
+            r'门诊号 [：:\s]',
+            r'住院号 [：:\s]',
+            r'体检号 [：:\s]',
+            r'No[.:]\s*\w+',
+            r'编号 [：:\s]',
+            r'\bID[：:\s]',
+            r'报告日期',
+            r'体检日期',
+            r'打印日期',
+            r'就诊卡',
+        ]
+
+        # 医疗检查关键词
+        keywords = [
+            '血常规', '尿常规', '便常规',
+            '肝功能', '肾功能', '血脂', '血糖',
+            '心电图', '胸片', 'CT', 'B 超', '彩超',
+            '肿瘤标志物', '凝血', '生化', '肝炎', '乙肝',
+            '甲功', '糖化', '离子', '心肌酶',
+            '免疫', '激素', '贫血', '检验', '检查',
+        ]
+
+        filtered_lines = []
+        for block in blocks:
+            content = block.get("block_content", "").strip()
+            if not content:
+                continue
+
+            # 排除过长的文本
+            if len(content) > 50:
+                continue
+
+            # 检查是否包含排除模式
+            if any(re.search(p, content, re.IGNORECASE) for p in exclude_patterns):
+                continue
+
+            # 保留：包含关键词 或 短文本（<20 字符）
+            if any(kw in content for kw in keywords) or len(content) < 20:
+                filtered_lines.append(content)
+
+        return "\n".join(filtered_lines)
