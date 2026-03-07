@@ -52,18 +52,21 @@ def main():
     for res in output:
         # 创建以输入文件名命名的子目录
         base_name = os.path.basename(res['input_path'])
-        # 添加页面索引作为更深层的目录
-        page_index = res.get('page_index', 0)
-        output_subdir = os.path.join(args.output, base_name, str(page_index))
+        output_subdir = os.path.join(args.output, base_name)
         os.makedirs(output_subdir, exist_ok=True)
+
+        # 添加页面索引作为更深层的目录
+        page_index = res.get('page_index', 0) or 0
+        output_subsubdir = os.path.join(output_subdir, str(page_index))
+        os.makedirs(output_subsubdir, exist_ok=True)
         
         # 保存 JSON 结果到子目录
-        res.save_to_json(save_path=output_subdir)
+        res.save_to_json(save_path=output_subsubdir)
         
         # 保存图片到子目录
         for idx, img_info in enumerate(res['imgs_in_doc']):
             img = img_info['img']
-            save_path = os.path.join(output_subdir, img_info['path'])
+            save_path = os.path.join(output_subsubdir, img_info['path'])
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             img.save(save_path)
     
