@@ -399,7 +399,7 @@ class PaddleOCRRunner:
             name_without_ext = os.path.splitext(img_name)[0]
             parts = name_without_ext.split('_')
 
-            if len(parts) >= 6 and parts[-6] == 'image':
+            if len(parts) >= 6 and name_without_ext.startswith("img_in_image_box_"):
                 img_bbox = list(map(int, parts[-4:]))
                 if img_bbox == bbox:
                     return img_path
