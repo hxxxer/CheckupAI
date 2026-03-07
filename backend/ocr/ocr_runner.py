@@ -95,7 +95,6 @@ class PaddleOCRRunner:
             - pages: 该文件的页面列表
         """
         files_data = []  # List[Dict]: 按文件分组的数据
-        all_image_paths = []
 
         # 遍历所有以文件名命名的子目录
         for file_dir in os.listdir(output_dir):
@@ -111,10 +110,13 @@ class PaddleOCRRunner:
                 if os.path.isfile(page_path):
                     continue
 
+                page_jsons = []
+                page_images = []
+
                 # 收集该页面目录下的所有图片路径
                 for img_file in os.listdir(page_path):
                     if img_file.endswith(('.jpg', '.png', '.jpeg')):
-                        all_image_paths.append(os.path.join(page_path, img_file))
+                        page_images.append(os.path.join(page_path, img_file))
 
                 for filename in os.listdir(page_path):
                     if not filename.endswith('.json'):
@@ -128,10 +130,20 @@ class PaddleOCRRunner:
                     try:
                         with open(json_file, 'r', encoding='utf-8') as f:
                             page_data = json.load(f)
-                            file_pages.append(page_data)
+                            page_jsons.append(page_data)
                     except (json.JSONDecodeError, IOError) as e:
                         print(f"⚠️ 加载 JSON 文件失败 {json_file}: {str(e)}")
                         continue
+                
+                if len(page_jsons) == 0:
+                    raise RuntimeError(f"文件 {page_path} 中没有有效的 JSON 文件")
+                elif len(page_jsons) > 1:
+                    print(f"⚠️ 文件 {page_path} 中有多个 JSON 文件，将只使用第一个")
+
+                file_pages.append({
+                    'page_json': page_jsons[0],
+                    'page_images': page_images
+                })
 
             if file_pages:
                 # 按 file 分组
@@ -140,13 +152,12 @@ class PaddleOCRRunner:
                     'pages': file_pages
                 })
 
-        return files_data, all_image_paths
+        return files_data
 
 
     def parse_result(
         self,
-        ocr_output: List[Dict[str, Any]],
-        image_paths: List[str]
+        ocr_output: List[Dict[str, Any]]
     ) -> List[RawOCRResult]:
         """
         解析 OCR 输出结果，转换为 schema.py 定义的结构
@@ -166,7 +177,10 @@ class PaddleOCRRunner:
 
             raw_pages = []
             for page_data in pages:
-                raw_page = self._parse_single_page(page_data, image_paths)
+                image_paths = page_data.get('page_images', [])
+                page_json = page_data.get('page_json', {})
+
+                raw_page = self._parse_single_page(page_json, image_paths)
                 raw_pages.append(raw_page)
 
             file_format = os.path.splitext(input_path)[1].lower().lstrip('.')
@@ -198,8 +212,8 @@ class PaddleOCRRunner:
             RawPage 对象
         """
         blocks = page_data.get("parsing_res_list", [])
-        page_index = page_data.get("page_index", 0)
-        page_count = page_data.get("page_count", 1)
+        page_index = page_data.get("page_index", 0) or 0
+        page_count = page_data.get("page_count", 1) or 1
 
         # 分类 blocks
         text_regions = []
