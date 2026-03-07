@@ -1,9 +1,13 @@
-# 忽略 sensitive 下所有内容
-sensitive/**
+# 忽略所有文件
+*
 
-# 但保留目录结构
-!sensitive/
-!sensitive/**/
+# 但保留 .gitignore 和 .gitkeep
+!.gitignore
+!.gitkeep
 
-# 保留占位文件
-!sensitive/**/.gitkeep
+# 保留所有目录结构
+!*/
+
+# 在所有子目录中，只保留 .gitkeep
+*/*
+!*/.gitkeep
