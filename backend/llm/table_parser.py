@@ -212,6 +212,6 @@ class TableParserLLM:
 
 
 table_parser = TableParserLLM(
-    model_path=settings.llm_table_model_path,
+    model_path=settings.llm_model_path,
     prompt_path=settings.llm_table_prompt
 )
