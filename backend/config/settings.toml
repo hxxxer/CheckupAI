@@ -15,7 +15,7 @@ ocr_python = "/root/autodl-tmp/envs/paddle/bin/python"  # Linux/Mac
 project_root = "."  
 
 # OCR处理脚本（相对于project_root）
-ocr_script = "backend/ocr/ocr_runner.py"  
+ocr_script = "backend/ocr/runner.py"  
 
 # 临时文件交换目录（OCR输出 → LLM输入）
 temp_dir = "data/temp"  
