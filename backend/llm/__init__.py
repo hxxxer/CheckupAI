@@ -1,1 +1,1 @@
-from .table_parser_llm import table_parser
+from .table_parser import table_parser
