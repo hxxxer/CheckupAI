@@ -19,7 +19,7 @@ def __getattr__(name):
     只有在真正使用 PaddleOCRRunner 时才会触发导入和初始化。
     """
     if name == 'PaddleOCRRunner':
-        from .ocr_runner import PaddleOCRRunner
+        from .runner import PaddleOCRRunner
         return PaddleOCRRunner
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

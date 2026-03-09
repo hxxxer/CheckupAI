@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from backend.config import settings
-from backend.instances import table_parser
+from backend.llm import table_parser
 from backend.ocr import (Image, RawOCRResult, RawPage, Table, TableItem,
                          TextRegion, table_html_clean, table_html_to_md)
 
