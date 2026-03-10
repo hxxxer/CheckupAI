@@ -1,44 +1,42 @@
 import json
 import re
 import tomllib
+from openai import OpenAI
 from typing import Any, Union
-from vllm import LLM, SamplingParams
 from backend.config import settings
 
 
 class TableParserLLM:
-    def __init__(self, model_path: str, prompt_path: str):
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000/v1",
+        api_key: str = "EMPTY",
+        model: str = "Qwen3-VL-4B-Instruct"
+    ):
         """
-        初始化LLM处理器
-        :param model_path: 模型路径
-        :param prompt_path: Prompt配置文件路径
+        初始化客户端
+        
+        Args:
+            base_url: vLLM API地址
+            api_key: API密钥（vLLM默认为EMPTY）
+            model: 模型名称
         """
-        self.model_path = model_path
-        self.prompt_path = prompt_path
-        self._llm = None
-        self._tokenizer = None
-        self._prompt = None
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
+        self.model = model
+        
+        # 采样参数配置
+        self.sampling_params = {
+            "temperature": 1.0,          # 温度
+            "top_p": 1.0,                # 核采样
+            "top_k": 40,                 # Top-K采样
+            "repetition_penalty": 1.0,   # 重复惩罚
+            "presence_penalty": 2.0,     # 存在惩罚
+            "max_tokens": 32768,         # 最大生成长度
+        }
 
-    def _load_model(self) -> Any:
-        """加载LLM模型"""
-        if self._llm is None:
-            self._llm = LLM(
-                model=self.model_path,
-                dtype="float16",
-                quantization="awq",
-                # gpu_memory_utilization=0.8,
-                max_model_len=16384,
-                enforce_eager=False,
-                trust_remote_code=True,
-            )
-        return self._llm
-
-    def _load_tokenizer(self) -> Any:
-        """加载Tokenizer"""
-        if self._tokenizer is None:
-            llm = self._load_model()
-            self._tokenizer = llm.get_tokenizer()
-        return self._tokenizer
 
     def _build_prompt(self) -> str:
         """构建Prompt"""
@@ -95,9 +93,6 @@ class TableParserLLM:
         """
         if not table_data or not table_data.get("tables"):
             return []
-        
-        # 加载模型和Tokenizer
-        tokenizer = self._load_tokenizer()
 
         # 构建Prompt
         prompt = self._build_prompt()
@@ -122,27 +117,17 @@ class TableParserLLM:
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": user_content}
             ]
-            text = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=False
-            )
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    **self.sampling_params
+                )
+                
+            except Exception as e:
+                raise RuntimeError(f"API调用失败: {str(e)}")
 
-            # 推理参数
-            sampling_params = SamplingParams(
-                temperature=0.7,
-                top_k=20,
-                top_p=0.8,
-                max_tokens=8192,
-                stop=["<|im_end|>", "<|endoftext|>"]  # 设置停止词
-            )
-
-            # 执行推理
-            llm = self._load_model()
-            outputs = llm.generate([text], sampling_params)
-
-            content = outputs[0].outputs[0].text
+            content = response.choices[0].message.content
             parsed_result = self.safe_json_parse(content)
 
             # 安全解析JSON
@@ -151,14 +136,6 @@ class TableParserLLM:
         # print("提取结果:", content)
 
         return results
-
-    def sleep(self):
-        if self._llm is not None:
-            self._llm.sleep(1)
-
-    def wake_up(self):
-        if self._llm is not None:
-            self._llm.wake_up()
 
     @staticmethod
     def safe_json_parse(text: str) -> Union[dict, list, None]:
@@ -211,7 +188,12 @@ class TableParserLLM:
         return None
 
 
-table_parser = TableParserLLM(
-    model_path=settings.llm_model_path,
-    prompt_path=settings.llm_table_prompt
-)
+_table_parser = None
+def get_table_parser(prompt_path: str = None) -> TableParserLLM:
+    global _table_parser
+    if _table_parser is None:
+        _table_parser = TableParserLLM(prompt_path=prompt_path)
+    return _table_parser
+
+table_parser = get_table_parser()
+
