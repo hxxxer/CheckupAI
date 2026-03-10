@@ -227,25 +227,50 @@ class TextAnalyzer:
         return None
 
 
-# 便捷函数
-def analyze_text(
-    ocr_results: List[RawOCRResult],
+# 全局单例实例
+_text_analyzer_instance: TextAnalyzer | None = None
+_text_analyzer_config: Dict[str, Any] = {}
+
+
+def get_text_analyzer(
     prompt_path: str | None = None,
-    base_url: str = "http://localhost:8000/v1"
-) -> List[Dict[str, Any]]:
+    base_url: str | None = None,
+    api_key: str | None = None,
+    model_name: str | None = None
+) -> TextAnalyzer:
     """
-    便捷函数：分析 OCR 结果中的文本
+    获取 TextAnalyzer 全局单例实例
 
     Args:
-        ocr_results: OCR 解析结果列表
-        prompt_path: Prompt 配置文件路径，默认使用内置路径
-        base_url: vllm server 地址
+        prompt_path: Prompt 配置文件路径（仅首次调用有效）
+        base_url: vllm server 地址（仅首次调用有效）
+        api_key: API Key（仅首次调用有效）
+        model_name: 模型名称（仅首次调用有效）
 
     Returns:
-        分析结果列表
+        TextAnalyzer 单例实例
     """
-    if prompt_path is None:
-        prompt_path = str(Path(__file__).parent / "text_analyzer_prompt.toml")
+    global _text_analyzer_instance, _text_analyzer_config
 
-    analyzer = TextAnalyzer(prompt_path=prompt_path, base_url=base_url)
-    return analyzer.analyze(ocr_results)
+    if _text_analyzer_instance is None:
+        # 使用传入参数或默认值
+        if prompt_path is None:
+            prompt_path = str(Path(__file__).parent /
+                              "text_analyzer_prompt.toml")
+
+        config = {
+            "prompt_path": prompt_path,
+            "base_url": base_url or "http://localhost:8000/v1",
+            "api_key": api_key or "not-needed",
+            "model_name": model_name or "Qwen3-4B"
+        }
+
+        # 保存配置
+        _text_analyzer_config = config
+
+        # 创建实例
+        _text_analyzer_instance = TextAnalyzer(**_text_analyzer_config)
+
+    return _text_analyzer_instance
+
+text_analyzer = get_text_analyzer()
