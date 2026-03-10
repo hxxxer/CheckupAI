@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from backend.config import settings
-from backend.instances import table_parser
+from backend.llm import table_parser
 from backend.ocr import (Image, RawOCRResult, RawPage, Table, TableItem,
                          TextRegion, table_html_clean, table_html_to_md)
 
@@ -30,7 +30,6 @@ class PaddleOCRRunner:
         Args:
             use_gpu: 是否使用 GPU，默认从 settings 读取
             gpu_id: GPU 设备 ID，默认从 settings 读取
-            table_parser: 表格解析器实例（依赖注入），用于 LLM 表格解析
         """
         self.use_gpu = use_gpu if use_gpu is not None else settings.ocr_use_gpu
         self.gpu_id = gpu_id if gpu_id is not None else settings.ocr_gpu_id

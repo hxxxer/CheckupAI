@@ -61,7 +61,6 @@ class Settings:
         llm_config = config.get("llm", {})
         self.llm_table_prompt: str = str(
             (project_root / llm_config.get("table_prompt", "")).resolve())
-        self.llm_table_model_path: str = llm_config.get("table_model_path", "")
 
     def _validate_paths(self):
         """关键路径存在性校验"""

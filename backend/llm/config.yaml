@@ -1,0 +1,20 @@
+# 模型配置
+model: /root/autodl-temp/models/Qwen/Qwen3.5-4B
+served-model-name: Qwen3.5-4B
+
+# 服务器配置
+host: "0.0.0.0"
+port: 8000
+
+# 性能配置
+gpu-memory-utilization: 0.6
+tensor-parallel-size: 1
+pipeline-parallel-size: 1
+
+# 其他配置
+trust-remote-code: true
+enforce-eager: false
+max-model-len: 4096
+
+# 日志配置
+uvicorn-log-level: "info"

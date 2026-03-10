@@ -15,7 +15,7 @@ ocr_python = "/root/autodl-tmp/envs/paddle/bin/python"  # Linux/Mac
 project_root = "."  
 
 # OCR处理脚本（相对于project_root）
-ocr_script = "backend/ocr/ocr_runner.py"  
+ocr_script = "backend/ocr/runner.py"  
 
 # 临时文件交换目录（OCR输出 → LLM输入）
 temp_dir = "data/temp"  
@@ -29,7 +29,6 @@ gpu_id = 0
 output_format = "json"  # html/markdown/json
 
 [llm]
-table_model_path = "/root/autodl-tmp/models/Qwen/Qwen3-8B-AWQ"
-table_prompt = "backend/ocr/llm_table_prompt.toml"
+table_prompt = "backend/llm/prompt_templates/table_parser.toml"
 max_retries = 3
 timeout_seconds = 120
