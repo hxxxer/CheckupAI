@@ -229,9 +229,10 @@ class PaddleOCRRunner:
             block_id = block.get("block_id", len(text_regions) + len(tables) + len(images))
             block_text = block.get("block_content", "")
 
-            if label == "text":
+            if label in ["text", "content", "doc_title", "figure_title", "paragraph_title"]:
                 text_regions.append(TextRegion(
                     index=block_id,
+                    label=label,
                     text=block_text,
                     bbox=tuple(bbox) if bbox else None,
                     block_index=len(text_regions)

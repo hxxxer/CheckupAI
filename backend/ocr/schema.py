@@ -23,6 +23,7 @@ class TextRegion:
     """
 
     index: int  # block 序号
+    label: str
     text: str  # OCR 识别出的原始文本，保留原文不做任何清洗
     bbox: tuple[int, int, int, int] | None = None  # (x0, y0, x1, y1) 像素坐标
     confidence: float | None = None  # 0.0~1.0，引擎置信度，不支持则为 None
