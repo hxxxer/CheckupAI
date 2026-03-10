@@ -1,13 +1,16 @@
 import json
+import os
 import re
 import tomllib
-from openai import OpenAI
 from typing import Any, Union
+
+from openai import OpenAI
 
 
 class TableParserLLM:
     def __init__(
         self,
+        prompt_path,
         base_url: str = "http://localhost:8000/v1",
         api_key: str = "EMPTY",
         model: str = "Qwen3-VL-4B-Instruct"
@@ -20,6 +23,9 @@ class TableParserLLM:
             api_key: API密钥（vLLM默认为EMPTY）
             model: 模型名称
         """
+        self.prompt_path = prompt_path
+        self._prompt = None
+
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url
@@ -187,11 +193,18 @@ class TableParserLLM:
         return None
 
 
+# 获取环境变量
+openai_base_url = os.getenv("OPENAI_BASE_URL")
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
 _table_parser = None
 def get_table_parser(prompt_path: str = None) -> TableParserLLM:
     global _table_parser
     if _table_parser is None:
-        _table_parser = TableParserLLM(prompt_path=prompt_path)
+        _table_parser = TableParserLLM(prompt_path=prompt_path,
+                                       openai_base_url=openai_base_url,
+                                       openai_api_key=openai_api_key,
+                                       model="Qwen3-VL-4B-Instruct")
     return _table_parser
 
 table_parser = get_table_parser()
