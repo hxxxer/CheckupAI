@@ -13,7 +13,7 @@ class TableParserLLM:
         prompt_path,
         base_url: str = "http://localhost:8000/v1",
         api_key: str = "EMPTY",
-        model: str = "Qwen3-VL-4B-Instruct"
+        model: str = "Qwen3.5-4B"
     ):
         """
         初始化客户端
@@ -204,7 +204,7 @@ def get_table_parser(prompt_path: str = None) -> TableParserLLM:
         _table_parser = TableParserLLM(prompt_path=prompt_path,
                                        openai_base_url=openai_base_url,
                                        openai_api_key=openai_api_key,
-                                       model="Qwen3-VL-4B-Instruct")
+                                       model="Qwen3.5-4B")
     return _table_parser
 
 table_parser = get_table_parser()
