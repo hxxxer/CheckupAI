@@ -3,7 +3,6 @@ import re
 import tomllib
 from openai import OpenAI
 from typing import Any, Union
-from backend.config import settings
 
 
 class TableParserLLM:
