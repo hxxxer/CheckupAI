@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from backend.config import settings
-from backend.ocr import PaddleOCRRunner
+from backend.ocr import PaddleOCRRunner, text_analyzer
 
 
 def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None):
@@ -30,6 +30,8 @@ def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None):
     dates = runner.load_result(output_path)
 
     structured_data = runner.parse_result(dates)
+
+    text_results = text_analyzer.analyze(structured_data)
 
 
 def run_ocr(input_path: str, runner: Optional[PaddleOCRRunner] = None) -> str:
