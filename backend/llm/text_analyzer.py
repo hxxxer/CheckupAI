@@ -28,7 +28,7 @@ class TextAnalyzer:
         prompt_path: str,
         base_url: str = "http://localhost:8000/v1",
         api_key: str = "EMPTY",
-        model_name: str = "Qwen3-4B"
+        model: str = "Qwen3-4B"
     ):
         """
         初始化文本分析器
@@ -39,13 +39,25 @@ class TextAnalyzer:
             api_key: API Key（本地服务不需要）
             model_name: 模型名称
         """
-        self.client = OpenAI(
-            base_url=base_url,
-            api_key=api_key
-        )
-        self.model_name = model_name
         self.prompt_path = prompt_path
         self._prompt = None
+
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
+        self.model = model
+
+        # 采样参数配置
+        self.sampling_params = {
+            "temperature": 1.0,          # 温度
+            "top_p": 0.95,               # 核采样
+            "presence_penalty": 2.0,     # 存在惩罚
+            "max_tokens": 32768,         # 最大生成长度
+            "extra_body": {
+                "top_k": 40,             # Top-K采样
+            }
+        }
 
     def _load_prompt(self) -> str:
         """加载 Prompt 配置"""
@@ -138,11 +150,9 @@ class TextAnalyzer:
         ]
 
         response = self.client.chat.completions.create(
-            model=self.model_name,
+            model=self.model,
             messages=messages,
-            temperature=0.7,
-            top_p=0.8,
-            max_tokens=2048
+            **self.sampling_params
         )
 
         content = response.choices[0].message.content
@@ -194,7 +204,7 @@ def get_text_analyzer() -> TextAnalyzer:
         _text_analyzer = TextAnalyzer(prompt_path=settings.llm_text_prompt,
                                       base_url=base_url,
                                       api_key=api_key,
-                                      model_name="Qwen3-4B")
+                                      model="Qwen3-4B")
     return _text_analyzer
 
 
