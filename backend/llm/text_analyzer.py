@@ -16,6 +16,7 @@ from typing import Any, Dict, List
 from openai import OpenAI
 
 from backend.config import settings
+from backend.llm import safe_json_parse
 from backend.ocr import RawOCRResult, RawPage
 
 
@@ -147,7 +148,7 @@ class TextAnalyzer:
         content = response.choices[0].message.content
 
         # 解析 JSON 结果
-        result = self._safe_json_parse(content)
+        result = safe_json_parse(content)
 
         # 添加页码信息
         if result is None:
@@ -179,61 +180,14 @@ class TextAnalyzer:
 
         return "\n".join(lines)
 
-    @staticmethod
-    def _safe_json_parse(text: str) -> Dict[str, Any] | None:
-        """
-        安全地解析 JSON
-
-        Args:
-            text: LLM 输出的文本
-
-        Returns:
-            解析后的字典，失败返回 None
-        """
-        if not text:
-            return None
-
-        # 清理文本
-        cleaned_text = text.strip()
-
-        # 移除常见的前缀/后缀
-        prefixes_to_remove = ['```json', '```', 'json']
-        suffixes_to_remove = ['```']
-
-        for prefix in prefixes_to_remove:
-            if cleaned_text.startswith(prefix):
-                cleaned_text = cleaned_text[len(prefix):].strip()
-                break
-
-        for suffix in suffixes_to_remove:
-            if cleaned_text.endswith(suffix):
-                cleaned_text = cleaned_text[:-len(suffix)].strip()
-                break
-
-        # 尝试直接解析
-        try:
-            return json.loads(cleaned_text)
-        except json.JSONDecodeError:
-            pass
-
-        # 尝试提取对象部分
-        import re
-        object_matches = re.findall(r'\{[\s\S]*?\}', cleaned_text)
-        if object_matches:
-            try:
-                return json.loads(object_matches[-1])
-            except json.JSONDecodeError:
-                pass
-
-        print(f"无法解析 JSON: {text[:100]}...")
-        return None
-
 
 # 获取环境变量
 base_url = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
 api_key = os.getenv("OPENAI_API_KEY", "not-needed")
 
 _text_analyzer = None
+
+
 def get_text_analyzer() -> TextAnalyzer:
     global _text_analyzer
     if _text_analyzer is None:
@@ -242,5 +196,6 @@ def get_text_analyzer() -> TextAnalyzer:
                                       api_key=api_key,
                                       model_name="Qwen3-4B")
     return _text_analyzer
+
 
 text_analyzer = get_text_analyzer()

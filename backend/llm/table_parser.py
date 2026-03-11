@@ -3,9 +3,11 @@ import os
 import re
 import tomllib
 from typing import Any, Union
-from backend.config import settings
 
 from openai import OpenAI
+
+from backend.config import settings
+from backend.llm import safe_json_parse
 
 
 class TableParserLLM:
@@ -18,7 +20,7 @@ class TableParserLLM:
     ):
         """
         初始化客户端
-        
+
         Args:
             base_url: vLLM API地址
             api_key: API密钥（vLLM默认为EMPTY）
@@ -32,7 +34,7 @@ class TableParserLLM:
             base_url=base_url
         )
         self.model = model
-        
+
         # 采样参数配置
         self.sampling_params = {
             "temperature": 1.0,          # 温度
@@ -43,7 +45,6 @@ class TableParserLLM:
                 "top_k": 40,             # Top-K采样
             }
         }
-
 
     def _build_prompt(self) -> str:
         """构建Prompt"""
@@ -130,12 +131,12 @@ class TableParserLLM:
                     messages=messages,
                     **self.sampling_params
                 )
-                
+
             except Exception as e:
                 raise RuntimeError(f"API调用失败: {str(e)}")
 
             content = response.choices[0].message.content
-            parsed_result = self.safe_json_parse(content)
+            parsed_result = safe_json_parse(content)
 
             # 安全解析JSON
             results.append(parsed_result)
@@ -144,62 +145,14 @@ class TableParserLLM:
 
         return results
 
-    @staticmethod
-    def safe_json_parse(text: str) -> Union[dict, list, None]:
-        """
-        安全地解析JSON，包含多种清理策略
-        """
-        if not text:
-            return None
-
-        # 清理文本
-        cleaned_text = text.strip()
-
-        # 移除常见的前缀/后缀
-        prefixes_to_remove = ['```json', '```', 'json']
-        suffixes_to_remove = ['```']
-
-        for prefix in prefixes_to_remove:
-            if cleaned_text.startswith(prefix):
-                cleaned_text = cleaned_text[len(prefix):].strip()
-                break
-
-        for suffix in suffixes_to_remove:
-            if cleaned_text.endswith(suffix):
-                cleaned_text = cleaned_text[:-len(suffix)].strip()
-                break
-
-        # 尝试直接解析
-        try:
-            return json.loads(cleaned_text)
-        except json.JSONDecodeError:
-            pass
-
-        # 尝试提取数组部分
-        array_matches = re.findall(r'\[[\s\S]*?\]', cleaned_text)
-        if array_matches:
-            try:
-                return json.loads(array_matches[-1])  # 使用最后一个匹配的数组
-            except json.JSONDecodeError:
-                pass
-
-        # 尝试提取对象部分
-        object_matches = re.findall(r'\{[\s\S]*?\}', cleaned_text)
-        if object_matches:
-            try:
-                return json.loads(object_matches[-1])
-            except json.JSONDecodeError:
-                pass
-
-        print(f"无法解析JSON: {text[:100]}...")
-        return None
-
 
 # 获取环境变量
 base_url = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
 api_key = os.getenv("OPENAI_API_KEY", "EMPTY")
 
 _table_parser = None
+
+
 def get_table_parser() -> TableParserLLM:
     global _table_parser
     if _table_parser is None:
@@ -209,5 +162,5 @@ def get_table_parser() -> TableParserLLM:
                                        model="Qwen3.5-4B")
     return _table_parser
 
-table_parser = get_table_parser()
 
+table_parser = get_table_parser()
