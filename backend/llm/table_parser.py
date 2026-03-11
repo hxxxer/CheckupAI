@@ -3,6 +3,7 @@ import os
 import re
 import tomllib
 from typing import Any, Union
+from backend.config import settings
 
 from openai import OpenAI
 
@@ -195,16 +196,16 @@ class TableParserLLM:
 
 
 # 获取环境变量
-openai_base_url = os.getenv("OPENAI_BASE_URL")
-openai_api_key = os.getenv("OPENAI_API_KEY")
+base_url = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
+api_key = os.getenv("OPENAI_API_KEY", "EMPTY")
 
 _table_parser = None
-def get_table_parser(prompt_path: str = None) -> TableParserLLM:
+def get_table_parser() -> TableParserLLM:
     global _table_parser
     if _table_parser is None:
-        _table_parser = TableParserLLM(prompt_path=prompt_path,
-                                       openai_base_url=openai_base_url,
-                                       openai_api_key=openai_api_key,
+        _table_parser = TableParserLLM(prompt_path=settings.llm_table_prompt,
+                                       base_url=base_url,
+                                       api_key=api_key,
                                        model="Qwen3.5-4B")
     return _table_parser
 

@@ -1,5 +1,5 @@
 # 模型配置
-model: /root/autodl-temp/models/Qwen/Qwen3.5-4B
+model: /root/autodl-tmp/models/Qwen/Qwen3.5-4B
 served-model-name: Qwen3.5-4B
 
 # 服务器配置
