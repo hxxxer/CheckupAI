@@ -9,7 +9,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from backend.config import settings
-from backend.ocr import PaddleOCRRunner, text_analyzer
+from backend.llm import text_analyzer
+from backend.ocr import PaddleOCRRunner
 
 
 def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None):
