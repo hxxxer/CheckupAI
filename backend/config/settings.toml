@@ -30,5 +30,6 @@ output_format = "json"  # html/markdown/json
 
 [llm]
 table_prompt = "backend/llm/prompt_templates/table_parser.toml"
+text_prompt = "backend/llm/prompt_templates/text_analyzer.toml"
 max_retries = 3
 timeout_seconds = 120
