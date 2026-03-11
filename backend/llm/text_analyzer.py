@@ -8,13 +8,15 @@
 """
 
 import json
+import os
 import tomllib
 from pathlib import Path
 from typing import Any, Dict, List
 
 from openai import OpenAI
 
-from .schema import RawOCRResult, RawPage
+from backend.config import settings
+from backend.ocr import RawOCRResult, RawPage
 
 
 class TextAnalyzer:
@@ -24,7 +26,7 @@ class TextAnalyzer:
         self,
         prompt_path: str,
         base_url: str = "http://localhost:8000/v1",
-        api_key: str = "not-needed",
+        api_key: str = "EMPTY",
         model_name: str = "Qwen3-4B"
     ):
         """
@@ -227,50 +229,18 @@ class TextAnalyzer:
         return None
 
 
-# 全局单例实例
-_text_analyzer_instance: TextAnalyzer | None = None
-_text_analyzer_config: Dict[str, Any] = {}
+# 获取环境变量
+base_url = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
+api_key = os.getenv("OPENAI_API_KEY", "not-needed")
 
-
-def get_text_analyzer(
-    prompt_path: str | None = None,
-    base_url: str | None = None,
-    api_key: str | None = None,
-    model_name: str | None = None
-) -> TextAnalyzer:
-    """
-    获取 TextAnalyzer 全局单例实例
-
-    Args:
-        prompt_path: Prompt 配置文件路径（仅首次调用有效）
-        base_url: vllm server 地址（仅首次调用有效）
-        api_key: API Key（仅首次调用有效）
-        model_name: 模型名称（仅首次调用有效）
-
-    Returns:
-        TextAnalyzer 单例实例
-    """
-    global _text_analyzer_instance, _text_analyzer_config
-
-    if _text_analyzer_instance is None:
-        # 使用传入参数或默认值
-        if prompt_path is None:
-            prompt_path = str(Path(__file__).parent /
-                              "text_analyzer_prompt.toml")
-
-        config = {
-            "prompt_path": prompt_path,
-            "base_url": base_url or "http://localhost:8000/v1",
-            "api_key": api_key or "not-needed",
-            "model_name": model_name or "Qwen3-4B"
-        }
-
-        # 保存配置
-        _text_analyzer_config = config
-
-        # 创建实例
-        _text_analyzer_instance = TextAnalyzer(**_text_analyzer_config)
-
-    return _text_analyzer_instance
+_text_analyzer = None
+def get_text_analyzer() -> TextAnalyzer:
+    global _text_analyzer
+    if _text_analyzer is None:
+        _text_analyzer = TextAnalyzer(prompt_path=settings.llm_text_prompt,
+                                      base_url=base_url,
+                                      api_key=api_key,
+                                      model_name="Qwen3-4B")
+    return _text_analyzer
 
 text_analyzer = get_text_analyzer()
