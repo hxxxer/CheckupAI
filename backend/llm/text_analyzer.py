@@ -17,7 +17,7 @@ from openai import OpenAI
 
 from backend.config import settings
 from backend.llm import safe_json_parse
-from backend.ocr import RawOCRResult, RawPage
+from backend.ocr import OCRResult, Page
 
 
 class TextAnalyzer:
@@ -94,7 +94,7 @@ class TextAnalyzer:
 
     def analyze(
         self,
-        ocr_results: List[RawOCRResult]
+        ocr_results: List[OCRResult]
     ) -> List[Dict[str, Any]]:
         """
         分析 OCR 结果中的文本内容
@@ -122,7 +122,7 @@ class TextAnalyzer:
 
         return results
 
-    def _analyze_page(self, page: RawPage) -> Dict[str, Any]:
+    def _analyze_page(self, page: Page) -> Dict[str, Any]:
         """
         分析单个页面的文本
 
@@ -174,7 +174,7 @@ class TextAnalyzer:
 
         return result
 
-    def _build_page_text(self, page: RawPage) -> str:
+    def _build_page_text(self, page: Page) -> str:
         """
         合并一页的所有 regions 文本
 

@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from backend.config import settings
 from backend.llm import table_parser
-from backend.ocr import (Image, RawOCRResult, RawPage, Table, TableItem,
+from backend.ocr import (Image, OCRResult, Page, Table, TableItem,
                          TextRegion, table_html_clean, table_html_to_md)
 
 
@@ -157,7 +157,7 @@ class PaddleOCRRunner:
     def parse_result(
         self,
         ocr_output: List[Dict[str, Any]]
-    ) -> List[RawOCRResult]:
+    ) -> List[OCRResult]:
         """
         解析 OCR 输出结果，转换为 schema.py 定义的结构
 
@@ -183,7 +183,7 @@ class PaddleOCRRunner:
                 raw_pages.append(raw_page)
 
             file_format = os.path.splitext(input_path)[1].lower().lstrip('.')
-            result = RawOCRResult(
+            result = OCRResult(
                 source_path=input_path,
                 file_format=file_format or 'jpg',
                 total_pages=len(raw_pages),
@@ -199,7 +199,7 @@ class PaddleOCRRunner:
         self,
         page_data: Dict[str, Any],
         image_paths: List[str]
-    ) -> RawPage:
+    ) -> Page:
         """
         解析单个页面
 
@@ -276,7 +276,7 @@ class PaddleOCRRunner:
                 ))
 
         # 构建 RawPage
-        return RawPage(
+        return Page(
             page_index=page_index,
             image_width=page_data.get("width", 0),
             image_height=page_data.get("height", 0),

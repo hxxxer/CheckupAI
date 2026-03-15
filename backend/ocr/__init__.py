@@ -25,4 +25,4 @@ def __getattr__(name):
 
 
 # 用于 IDE 类型提示和__all__导出
-__all__ = ['PaddleOCRRunner', 'table_html_clean', 'table_html_to_md', 'RawOCRResult']
+__all__ = ['PaddleOCRRunner', 'table_html_clean', 'table_html_to_md', 'OCRResult']

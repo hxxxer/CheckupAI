@@ -73,7 +73,7 @@ class Image:
 
 
 @dataclass
-class RawPage:
+class Page:
     """单页的 OCR 原始输出。"""
 
     page_index: int  # 0-based
@@ -98,7 +98,7 @@ class RawPage:
 
 
 @dataclass
-class RawOCRResult:
+class OCRResult:
     """一份原始文件经 OCRRunner 处理后的完整中间结构。
 
     所有 Runner 对外输出统一为此类型。
@@ -130,4 +130,4 @@ class RawOCRResult:
     scanned_at: datetime  # 本次 OCR 扫描时间
 
     # --- 页面内容 ---
-    pages: list[RawPage] = field(default_factory=list)
+    pages: list[Page] = field(default_factory=list)
