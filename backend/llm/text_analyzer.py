@@ -86,6 +86,8 @@ class TextAnalyzer:
                     prompt += "输出：\n"
                     prompt += example.get("output", "") + "\n\n"
 
+            prompt += raw_prompt.get("task", {}).get("instruction", "")
+            prompt += "\n\n"
             self._prompt = prompt
 
         return self._prompt
