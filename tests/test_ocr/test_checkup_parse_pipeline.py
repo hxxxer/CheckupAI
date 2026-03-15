@@ -9,6 +9,8 @@ from backend.ocr import parse_checkup
 test_files_folder = os.path.join(settings.project_root, "tests/test_ocr/test_files/")
 test_output_folder = os.path.join(settings.project_root, "tests/test_ocr/test_output/", datetime.now().strftime("%Y%m%d_%H%M%S"))
 
+os.makedirs(test_output_folder, exist_ok=True)
+
 if not os.path.isdir(test_files_folder):
     raise FileNotFoundError(f"测试文件夹不存在：{test_files_folder}")
 
@@ -19,12 +21,19 @@ if not os.path.isdir(test_files_folder):
 # if not valid_files:
 #     raise ValueError(f"测试文件夹下未找到图片或 PDF 文件：{test_files_folder}")
 
-structured_data = parse_checkup(test_files_folder)
-
-for i in range(len(structured_data)):
-    try:
-        dict_data = structured_data[i].asdict()
-        with open(os.path.join(test_output_folder, f"{i}"), "w", encoding="utf-8") as f:
-            json.dump(dict_data, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"Error processing file {i}: {e}")
+try:
+    structured_data = parse_checkup(test_files_folder)
+    
+    for i in range(len(structured_data)):
+        try:
+            dict_data = asdict(structured_data[i])
+            output_file = os.path.join(test_output_folder, f"{i}.json")
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(dict_data, f, ensure_ascii=False, indent=4)
+            print(f"成功保存文件：{output_file}")
+        except Exception as e:
+            print(f"Error processing file {i}: {e}")
+            
+except Exception as e:
+    print(f"解析过程出错：{e}")
+    raise
