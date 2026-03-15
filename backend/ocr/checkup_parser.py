@@ -18,7 +18,7 @@ def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None) -> 
     执行体检报告 OCR 解析
 
     Args:
-        input_path: 输入图片路径
+        input_path: 输入图片或pdf路径，或者包含多个图片/pdf的文件夹路径
         runner: PaddleOCRRunner 运行实例，默认创建新实例
 
     Returns:
