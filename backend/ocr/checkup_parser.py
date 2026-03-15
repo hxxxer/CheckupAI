@@ -10,10 +10,10 @@ from typing import Any, Dict, List, Optional
 
 from backend.config import settings
 from backend.llm import text_analyzer
-from backend.ocr import PaddleOCRRunner
+from backend.ocr import PaddleOCRRunner, OCRResult
 
 
-def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None):
+def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None) -> list[OCRResult]:
     """
     执行体检报告 OCR 解析
 
@@ -22,7 +22,7 @@ def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None):
         runner: PaddleOCRRunner 运行实例，默认创建新实例
 
     Returns:
-        包含 tables、full_text 和 stats 的字典
+        包含多个完整结构化数据的列表
     """
     if runner is None:
         runner = PaddleOCRRunner()
