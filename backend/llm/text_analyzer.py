@@ -188,7 +188,7 @@ class TextAnalyzer:
         for region in sorted(page.regions, key=lambda x: x.index):
             text = region.text.strip()
             if text:
-                lines.append(f"[{region.index}] {text}")
+                lines.append(f"[{region.index}|{region.label}] {text}")
 
         return "\n".join(lines)
 
