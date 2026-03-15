@@ -148,14 +148,6 @@ class TextAnalyzer:
         # 解析 JSON 结果
         result_dict = safe_json_parse(content)
 
-        # 添加页码信息
-        if result is None:
-            result = {
-                "personal_info": {},
-                "positive_findings": [],
-                "summary": ""
-            }
-
         # 解析个人信息
         personal_info_dict = result_dict.get("personal_info", {})
         personal_info = PersonalInfo(
