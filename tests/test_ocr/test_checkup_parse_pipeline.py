@@ -21,7 +21,7 @@ if not os.path.isdir(test_files_folder):
 
 structured_data = parse_checkup(test_files_folder)
 
-for i in len(structured_data):
+for i in range(len(structured_data)):
     try:
         dict_data = structured_data[i].asdict()
         with open(os.path.join(test_output_folder, f"{i}"), "w", encoding="utf-8") as f:
