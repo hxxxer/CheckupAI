@@ -37,12 +37,13 @@ class TableParserLLM:
 
         # 采样参数配置
         self.sampling_params = {
-            "temperature": 1.0,          # 温度
-            "top_p": 0.95,               # 核采样
-            "presence_penalty": 2.0,     # 存在惩罚
             "max_tokens": 32768,         # 最大生成长度
+            "temperature": 0.7,          # 温度
+            "top_p": 0.8,               # 核采样
+            "presence_penalty": 1.5,     # 存在惩罚
             "extra_body": {
-                "top_k": 40,             # Top-K采样
+                "top_k": 20,             # Top-K采样
+                "chat_template_kwargs": {"enable_thinking": False},
             }
         }
 

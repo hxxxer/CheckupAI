@@ -28,7 +28,7 @@ class TextAnalyzer:
         prompt_path: str,
         base_url: str = "http://localhost:8000/v1",
         api_key: str = "EMPTY",
-        model: str = "Qwen3-4B"
+        model: str = "Qwen3.5-4B"
     ):
         """
         初始化文本分析器
@@ -50,12 +50,13 @@ class TextAnalyzer:
 
         # 采样参数配置
         self.sampling_params = {
-            "temperature": 1.0,          # 温度
-            "top_p": 0.95,               # 核采样
-            "presence_penalty": 2.0,     # 存在惩罚
             "max_tokens": 32768,         # 最大生成长度
+            "temperature": 0.7,          # 温度
+            "top_p": 0.8,               # 核采样
+            "presence_penalty": 1.5,     # 存在惩罚
             "extra_body": {
-                "top_k": 40,             # Top-K采样
+                "top_k": 20,             # Top-K采样
+                "chat_template_kwargs": {"enable_thinking": False},
             }
         }
 
@@ -216,7 +217,7 @@ def get_text_analyzer() -> TextAnalyzer:
         _text_analyzer = TextAnalyzer(prompt_path=settings.llm_text_prompt,
                                       base_url=base_url,
                                       api_key=api_key,
-                                      model="Qwen3-4B")
+                                      model="Qwen3.5-4B")
     return _text_analyzer
 
 
