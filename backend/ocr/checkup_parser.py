@@ -32,24 +32,9 @@ def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None):
 
     structured_data = runner.parse_result(dates)
 
-    text_results = text_analyzer.analyze(structured_data)
+    text_analyzer.analyze(structured_data)
 
-
-def run_ocr(input_path: str, runner: Optional[PaddleOCRRunner] = None) -> str:
-    """
-    执行 OCR 处理
-
-    Args:
-        input_path: 输入图片路径
-        runner: PaddleOCRRunner 实例，默认创建新实例
-
-    Returns:
-        输出 JSON 目录路径
-    """
-    if runner is None:
-        runner = PaddleOCRRunner()
-    output_json_path = runner.run(input_path)
-    return output_json_path
+    return structured_data
 
 
 # 测试
@@ -64,6 +49,8 @@ if __name__ == "__main__":
     # 核心：解析结构化数据
     try:
         structured_data = runner.parse_result(dates)
+
+        text_analyzer.analyze(structured_data)
 
         print("="*50)
         print(f"📊 共解析 {len(structured_data)} 个文件")
