@@ -7,7 +7,7 @@ from typing import Any, Union
 from openai import OpenAI
 
 from backend.config import settings
-from backend.llm import safe_json_parse
+from .utils import safe_json_parse
 
 
 class TableParserLLM:
