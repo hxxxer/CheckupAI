@@ -49,6 +49,7 @@ Thumbs.db
 *.png
 *.docx
 *.doc
+*.json
 
 # Model Files (too large for git)
 *.pth
