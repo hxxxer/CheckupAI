@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +30,31 @@ class TextRegion:
     confidence: float | None = None  # 0.0~1.0，引擎置信度，不支持则为 None
     block_index: int | None = None  # 在当前页中的块序号（从上到下，0-based）
 
+
+@dataclass
+class PersonalInfo:
+    """体检报告个人信息"""
+    name: str | None = None
+    gender: str | None = None
+    age: int | None = None
+    exam_date: str | None = None
+
+
+@dataclass
+class PositiveFinding:
+    """阳性/异常发现"""
+    text: str
+    region_index: int
+    type: Literal['检验异常', '影像异常', '诊断结论', '医生建议', '复查建议']
+
+
+@dataclass
+class TextAnalysis:
+    """体检报告文本分析结果"""
+    has_abnormal_findings: bool
+    personal_info: PersonalInfo
+    positive_findings: list[PositiveFinding] = field(default_factory=list)
+    summary: str | None = None
 
 # ---------------------------------------------------------------------------
 # 结构化表格
@@ -82,6 +108,8 @@ class Page:
 
     # 所有引擎都应填充：带 bbox 的文本块，兜底数据源
     regions: list[TextRegion] = field(default_factory=list)
+
+    text_analyses: TextAnalysis | None = None
 
     # 结构化表格
     tables: list[Table] = field(default_factory=list)
