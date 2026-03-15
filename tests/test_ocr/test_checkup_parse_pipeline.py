@@ -9,7 +9,7 @@ from backend.ocr import parse_checkup
 test_files_folder = os.path.join(settings.project_root, "tests/test_ocr/test_files/")
 test_output_folder = os.path.join(settings.project_root, "tests/test_ocr/test_output/", datetime.now().strftime("%Y%m%d_%H%M%S"))
 
-if not os.path.exists(test_output_folder):
+if not os.path.isdir(test_output_folder):
     raise FileNotFoundError(f"测试文件夹不存在：{test_files_folder}")
 
 # valid_extensions = {'.png', '.jpg', '.jpeg', '.pdf'}
