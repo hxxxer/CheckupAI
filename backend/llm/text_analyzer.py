@@ -17,7 +17,7 @@ from openai import OpenAI
 
 from backend.config import settings
 from backend.llm import safe_json_parse
-from backend.ocr import OCRResult, Page
+from backend.ocr import OCRResult, Page, TextAnalysis, PersonalInfo, PositiveFinding
 
 
 class TextAnalyzer:
@@ -95,34 +95,19 @@ class TextAnalyzer:
     def analyze(
         self,
         ocr_results: List[OCRResult]
-    ) -> List[Dict[str, Any]]:
+    ) -> None:
         """
-        分析 OCR 结果中的文本内容
+        分析 OCR 结果中的文本内容，且原地修改 OCR 结果
 
         Args:
             ocr_results: OCR 解析结果列表
-
-        Returns:
-            分析结果列表，每个文件一个结果
         """
-        results = []
-
         for ocr_result in ocr_results:
-            file_result = {
-                "source_path": ocr_result.source_path,
-                "pages": []
-            }
-
             # 逐页分析
             for page in ocr_result.pages:
-                page_result = self._analyze_page(page)
-                file_result["pages"].append(page_result)
+                page.text_analyses = self._analyze_page(page)
 
-            results.append(file_result)
-
-        return results
-
-    def _analyze_page(self, page: Page) -> Dict[str, Any]:
+    def _analyze_page(self, page: Page) -> TextAnalysis:
         """
         分析单个页面的文本
 
@@ -130,7 +115,7 @@ class TextAnalyzer:
             page: RawPage 对象
 
         Returns:
-            分析结果字典
+            TextAnalysis格式的分析结果
         """
         # 构建输入文本
         input_text = self._build_page_text(page)
@@ -160,7 +145,7 @@ class TextAnalyzer:
         content = response.choices[0].message.content
 
         # 解析 JSON 结果
-        result = safe_json_parse(content)
+        result_dict = safe_json_parse(content)
 
         # 添加页码信息
         if result is None:
@@ -170,7 +155,32 @@ class TextAnalyzer:
                 "summary": ""
             }
 
-        result["page_index"] = page.page_index
+        # 解析个人信息
+        personal_info_dict = result_dict.get("personal_info", {})
+        personal_info = PersonalInfo(
+            name=personal_info_dict.get("name"),
+            gender=personal_info_dict.get("gender"),
+            age=personal_info_dict.get("age"),
+            exam_date=personal_info_dict.get("exam_date")
+        )
+
+        # 解析阳性发现
+        positive_findings = []
+        for finding_dict in result_dict.get("positive_findings", []):
+            finding = PositiveFinding(
+                text=finding_dict.get("text", ""),
+                region_index=finding_dict.get("region_index", 0),
+                type=finding_dict.get("type", "检验异常")
+            )
+            positive_findings.append(finding)
+
+        result = TextAnalysis(
+            has_abnormal_findings=result_dict.get(
+                "has_abnormal_findings", False),
+            personal_info=personal_info,
+            positive_findings=positive_findings,
+            summary=result_dict.get("summary")
+        )
 
         return result
 
