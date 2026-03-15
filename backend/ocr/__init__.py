@@ -21,6 +21,9 @@ def __getattr__(name):
     if name == 'PaddleOCRRunner':
         from .runner import PaddleOCRRunner
         return PaddleOCRRunner
+    elif name == 'parse_checkup':
+        from .checkup_parser import parse_checkup
+        return parse_checkup
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
