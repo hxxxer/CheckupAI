@@ -12,11 +12,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
-export OPENAI_BASE_URL="http://localhost:8000/v1"
-export OPENAI_API_KEY="EMPTY"
-
 echo "使用配置文件: $CONFIG_FILE"
 echo "启动vLLM服务..."
 
 # 启动vLLM服务
-vllm serve --config "$CONFIG_FILE"
+VLLM_USE_MODELSCOPE=true vllm serve --config "$CONFIG_FILE"

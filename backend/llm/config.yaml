@@ -14,7 +14,7 @@ pipeline-parallel-size: 1
 # 其他配置
 trust-remote-code: true
 enforce-eager: false
-max-model-len: 4096
+max-model-len: 131072
 
 # 日志配置
 uvicorn-log-level: "info"
