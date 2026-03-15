@@ -37,12 +37,12 @@ class PaddleOCRRunner:
             os.path.dirname(__file__), "paddle_runner.py"
         )
 
-    def run(self, image_path: str, output_dir: Optional[str] = None) -> str:
+    def run(self, file_path: str, output_dir: Optional[str] = None) -> str:
         """
         执行 OCR 处理
 
         Args:
-            image_path: 输入图片路径
+            file_path: 输入图片/pdf路径，或者包含多个图片/pdf的文件夹路径
             output_dir: 输出 JSON 目录，默认生成带时间戳的目录
 
         Returns:
@@ -59,7 +59,7 @@ class PaddleOCRRunner:
         cmd = [
             settings.ocr_python,
             self._script_path,
-            "--image", str(image_path),
+            "--image", str(file_path),
             "--output", str(output_dir),
         ]
 
