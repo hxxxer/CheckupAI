@@ -24,6 +24,9 @@ def __getattr__(name):
     elif name == 'parse_checkup':
         from .checkup_parser import parse_checkup
         return parse_checkup
+    elif name == 'UniversalParser':
+        from .parser import UniversalParser
+        return UniversalParser
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

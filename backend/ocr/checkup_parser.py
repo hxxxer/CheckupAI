@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from backend.config import settings
 from backend.llm import text_analyzer
-from backend.ocr import PaddleOCRRunner, OCRResult
+from backend.ocr import PaddleOCRRunner, OCRResult, UniversalParser
 
 
 def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None) -> list[OCRResult]:
@@ -28,9 +28,10 @@ def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None) -> 
         runner = PaddleOCRRunner()
     output_path = runner.run(input_path)
 
-    dates = runner.load_result(output_path)
+    raw_outputs = runner.load_result(output_path)
 
-    structured_data = runner.parse_result(dates)
+    parser = UniversalParser()
+    structured_data = parser.parse(raw_outputs)
 
     text_analyzer.analyze(structured_data)
 
