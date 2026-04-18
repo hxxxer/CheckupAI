@@ -107,7 +107,7 @@ class PaddleOCRRunner:
                 page_json = None
 
                 # 收集该页面目录下的所有图片路径
-                for img_file in os.listdir(page_path):
+                for img_file in os.listdir(os.path.join(page_path, 'imgs')):
                     if img_file.endswith(('.jpg', '.png', '.jpeg')):
                         page_images.append(os.path.join(page_path, img_file))
 
