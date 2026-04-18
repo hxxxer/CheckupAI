@@ -8,8 +8,37 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
+
+@dataclass
+class RawBlock:
+    """OCR引擎输出的原始块（引擎无关）"""
+    block_id: int
+    label: str  # text/table/image/figure_title等
+    content: str
+    bbox: tuple[int, int, int, int] | None = None
+    confidence: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)  # 引擎特定元数据
+
+
+@dataclass
+class RawPageOutput:
+    """单页的原始OCR输出（引擎无关）"""
+    page_index: int
+    width: int
+    height: int
+    blocks: list[RawBlock] = field(default_factory=list)
+    image_paths: list[str] = field(default_factory=list)  # 该页提取的图片路径
+    raw_json: str | None = None  # 保留原始JSON
+
+
+@dataclass
+class RawFileOutput:
+    """单个文件的原始OCR输出（引擎无关）"""
+    input_path: str
+    pages: list[RawPageOutput] = field(default_factory=list)
+    ocr_engine: str
 
 # ---------------------------------------------------------------------------
 # 带 bbox 的文本块
