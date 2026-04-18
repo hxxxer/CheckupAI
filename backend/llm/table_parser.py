@@ -7,16 +7,18 @@ from typing import Any, Union
 from openai import OpenAI
 
 from backend.config import settings
+from .base_llm import BaseLLM
 from .utils import safe_json_parse
 
 
-class TableParserLLM:
+class TableParserLLM(BaseLLM):
     def __init__(
         self,
         prompt_path,
         base_url: str = "http://localhost:8000/v1",
         api_key: str = "EMPTY",
-        model: str = "Qwen3.5-4B"
+        model: str = "Qwen3.5-4B",
+        enable_thinking: bool = False
     ):
         """
         初始化客户端
@@ -26,65 +28,13 @@ class TableParserLLM:
             api_key: API密钥（vLLM默认为EMPTY）
             model: 模型名称
         """
-        self.prompt_path = prompt_path
-        self._prompt = None
-
-        self.client = OpenAI(
+        super().__init__(
+            prompt_path=prompt_path,
+            base_url=base_url,
             api_key=api_key,
-            base_url=base_url
+            model=model,
+            enable_thinking=enable_thinking
         )
-        self.model = model
-
-        # 采样参数配置
-        self.sampling_params = {
-            "max_tokens": 32768,         # 最大生成长度
-            "temperature": 0.7,          # 温度
-            "top_p": 0.8,               # 核采样
-            "presence_penalty": 1.5,     # 存在惩罚
-            "extra_body": {
-                "top_k": 20,             # Top-K采样
-                "chat_template_kwargs": {"enable_thinking": False},
-            }
-        }
-
-    def _build_prompt(self) -> str:
-        """构建Prompt"""
-        if self._prompt is None:
-            try:
-                with open(self.prompt_path, "rb") as f:
-                    raw_prompt = tomllib.load(f)
-            except FileNotFoundError:
-                raise FileNotFoundError(f"提取表格Prompt文件缺失: {self.prompt_path}")
-            except tomllib.TOMLDecodeError as e:
-                raise ValueError(f"TOML文件格式不合法: {self.prompt_path}: {e}")
-
-            prompt = raw_prompt.get("prompt", {}).get("role", "") + "\n\n"
-
-            if 'rules' in raw_prompt:
-                prompt += "规则：\n"
-                for key, rule in raw_prompt["rules"].items():
-                    prompt += f"{key}：{rule}\n"
-                prompt += "\n"
-
-            if 'output' in raw_prompt:
-                prompt += "输出格式：\n"
-                prompt += raw_prompt.get("title", "") + "\n"
-                prompt += raw_prompt.get("description", "") + "\n\n"
-
-            if 'examples' in raw_prompt:
-                prompt += "以下为若干个示例，涵盖绝大部分特殊情况处理方式：\n"
-                for key, example in raw_prompt["examples"].items():
-                    prompt += f"例子{key} - {example.get('title', '')}\n"
-                    prompt += "输入：\n"
-                    prompt += example.get("input", "") + "\n"
-                    prompt += "输出：\n"
-                    prompt += example.get("output", "") + "\n\n"
-
-            prompt += raw_prompt.get("task", {}).get("instruction", "")
-            prompt += "\n\n"
-            self._prompt = prompt
-
-        return self._prompt
 
     def parse(self, table_data: dict) -> Union[list, None]:
         """
@@ -104,7 +54,7 @@ class TableParserLLM:
             return []
 
         # 构建Prompt
-        prompt = self._build_prompt()
+        prompt = self._load_prompt()
 
         results = []
 
@@ -121,23 +71,11 @@ class TableParserLLM:
                 # f"【HTML源码】:\n{html_content}"
             )
 
-            # 构造消息
-            messages = [
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_content}
-            ]
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    **self.sampling_params
-                )
-
-            except Exception as e:
-                raise RuntimeError(f"API调用失败: {str(e)}")
-
-            content = response.choices[0].message.content
-            parsed_result = safe_json_parse(content)
+            # 调用 LLM
+            content = self._call_llm(prompt, user_content)
+            
+            # 解析 JSON
+            parsed_result = self._parse_json_response(content)
 
             # 安全解析JSON
             results.append(parsed_result)

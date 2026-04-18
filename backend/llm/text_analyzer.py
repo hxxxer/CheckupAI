@@ -28,7 +28,8 @@ class TextAnalyzer:
         prompt_path: str,
         base_url: str = "http://localhost:8000/v1",
         api_key: str = "EMPTY",
-        model: str = "Qwen3.5-4B"
+        model: str = "Qwen3.5-4B",
+        enable_thinking: bool = False
     ):
         """
         初始化文本分析器
@@ -39,59 +40,13 @@ class TextAnalyzer:
             api_key: API Key（本地服务不需要）
             model_name: 模型名称
         """
-        self.prompt_path = prompt_path
-        self._prompt = None
-
-        self.client = OpenAI(
+        super().__init__(
+            prompt_path=prompt_path,
+            base_url=base_url,
             api_key=api_key,
-            base_url=base_url
+            model=model,
+            enable_thinking=enable_thinking
         )
-        self.model = model
-
-        # 采样参数配置
-        self.sampling_params = {
-            "max_tokens": 32768,         # 最大生成长度
-            "temperature": 0.7,          # 温度
-            "top_p": 0.8,               # 核采样
-            "presence_penalty": 1.5,     # 存在惩罚
-            "extra_body": {
-                "top_k": 20,             # Top-K采样
-                "chat_template_kwargs": {"enable_thinking": False},
-            }
-        }
-
-    def _load_prompt(self) -> str:
-        """加载 Prompt 配置"""
-        if self._prompt is None:
-            with open(self.prompt_path, "rb") as f:
-                raw_prompt = tomllib.load(f)
-
-            prompt = raw_prompt.get("prompt", {}).get("role", "") + "\n\n"
-
-            if 'rules' in raw_prompt:
-                prompt += "规则：\n"
-                for key, rule in raw_prompt["rules"].items():
-                    prompt += f"{key}：{rule}\n"
-                prompt += "\n"
-
-            if 'output' in raw_prompt:
-                prompt += "输出格式：\n"
-                prompt += raw_prompt.get("format", "") + "\n\n"
-
-            if 'examples' in raw_prompt:
-                prompt += "示例：\n"
-                for key, example in raw_prompt["examples"].items():
-                    prompt += f"例子{key} - {example.get('title', '')}\n"
-                    prompt += "输入：\n"
-                    prompt += example.get("input", "") + "\n"
-                    prompt += "输出：\n"
-                    prompt += example.get("output", "") + "\n\n"
-
-            prompt += raw_prompt.get("task", {}).get("instruction", "")
-            prompt += "\n\n"
-            self._prompt = prompt
-
-        return self._prompt
 
     def analyze(
         self,
@@ -132,21 +87,11 @@ class TextAnalyzer:
 
         # 调用 LLM
         prompt = self._load_prompt()
-        messages = [
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": input_text}
-        ]
-
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            **self.sampling_params
-        )
-
-        content = response.choices[0].message.content
+        
+        content = self._call_llm(prompt, input_text)
 
         # 解析 JSON 结果
-        result_dict = safe_json_parse(content)
+        result_dict = self._parse_json_response(content)
 
         # 解析个人信息
         personal_info_dict = result_dict.get("personal_info", {})
