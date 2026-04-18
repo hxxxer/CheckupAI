@@ -28,6 +28,7 @@ def table_html_clean(table_html: str) -> str:
         r'\downarrow ': '↓ ',    # 下箭头
         r'\times ': ' × ',        # 乘号
         r'\mu ': 'μ',           # 删除\m
+        r'\gamma ': 'γ',
     }
 
     # 逐个替换转义字符
