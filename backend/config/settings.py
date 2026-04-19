@@ -63,6 +63,8 @@ class Settings:
             (project_root / llm_config.get("table_prompt", "")).resolve())
         self.llm_text_prompt: str = str(
             (project_root / llm_config.get("text_prompt", "")).resolve())
+        self.llm_table_parse_router_prompt: str = str(
+            (project_root / llm_config.get("table_parse_router_prompt", "")).resolve())
 
     def _validate_paths(self):
         """关键路径存在性校验"""
