@@ -109,27 +109,27 @@ class UniversalParser:
                 first_table_found = True
                 table_html = block.content
                 table_html = table_html_clean(table_html)
-                table_md = table_html_to_md(table_html)
+                tables_md = table_html_to_md(table_html)
 
-                if table_md:
+                if tables_md:
                     # 只给第一个表格添加上下文（每个页面独立处理）
                     if len(tables) == 0 and context_text is None:
                         # 过滤 context 内容
                         context_text = self._filter_context_text(context_before_table)
                         if context_text:
-                            table_md["tables"][0]["context"] = context_text
+                            tables_md["tables"][0]["context"] = context_text
 
-                    llm_result = table_parser.parse(table_md)
-
-                    # 转换为 Table 对象
-                    if llm_result and len(llm_result) > 0:
-                        for table in llm_result:
+                    for table_md in tables_md["tables"]:
+                        llm_result = table_parser.parse(table_md)
+                        # 转换为 Table 对象
+                        if llm_result:
                             table_obj = Table(
                                 index=block.block_id,
-                                title=table.get('title', '') if isinstance(table, dict) else '',
-                                items=self._build_table_items(table) if isinstance(table, dict) else []
+                                title=llm_result.get('title', '') if isinstance(llm_result, dict) else '',
+                                items=self._build_table_items(llm_result) if isinstance(llm_result, dict) else []
                             )
                             tables.append(table_obj)
+
 
             elif block.label == "image":
                 img_path = self._match_image_path(raw_page.image_paths, block.bbox)

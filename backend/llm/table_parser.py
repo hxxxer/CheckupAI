@@ -39,16 +39,18 @@ class TableParserLLM(BaseLLM):
     def parse(self, table_data: dict) -> Union[list, None]:
         """
         使用 LLM 解析表格数据并解析为 JSON
-        :param table_data: table_html_to_md 返回的结构化数据，包含：
-            - table_count: 表格数量
-            - tables: 表格列表，每个表格包含：
-              - matrix: 二维矩阵
-              - segments: 分段信息
-              - is_double_column: 是否双栏
-              - markdown: Markdown 字符串
-              - html: HTML 字符串
-              - context: 第一个表格前的上下文文本（可选）
-        :return: 解析后的JSON结果
+
+        Args:
+            table_data: table_html_to_md 返回的结构化数据中的表格，包含：
+            - matrix: 二维矩阵
+            - segments: 分段信息
+            - is_double_column: 是否双栏
+            - markdown: Markdown 字符串
+            - html: HTML 字符串
+            - context: 第一个表格前的上下文文本（可选）
+
+        Returns:
+            解析后的JSON结果
         """
         if not table_data or not table_data.get("tables"):
             return []
@@ -56,33 +58,27 @@ class TableParserLLM(BaseLLM):
         # 构建Prompt
         prompt = self._load_prompt()
 
-        results = []
+        context = table_data.get("context", "")
+        context = f"【表格上方原始文本】:\n{context}\n\n" if context else ""
 
-        for table in table_data["tables"]:
-            context = table.get("context", "")
-            context = f"【表格上方原始文本】:\n{context}\n\n" if context else ""
+        md_content = table_data["markdown"]
+        html_content = table_data["html"]
 
-            md_content = table["markdown"]
-            html_content = table["html"]
+        user_content = (
+            f"{context}"
+            f"【Markdown】:\n{md_content}\n\n"
+            # f"【HTML源码】:\n{html_content}"
+        )
 
-            user_content = (
-                f"{context}"
-                f"【Markdown】:\n{md_content}\n\n"
-                # f"【HTML源码】:\n{html_content}"
-            )
-
-            # 调用 LLM
-            content = self._call_llm(prompt, user_content)
-            
-            # 解析 JSON
-            parsed_result = self._parse_json_response(content)
-
-            # 安全解析JSON
-            results.append(parsed_result)
+        # 调用 LLM
+        content = self._call_llm(prompt, user_content)
+        
+        # 解析 JSON
+        parsed_result = self._parse_json_response(content)
 
         # print("提取结果:", content)
 
-        return results
+        return parsed_result
 
 
 # 获取环境变量
