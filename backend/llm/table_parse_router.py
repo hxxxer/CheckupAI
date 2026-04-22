@@ -1,7 +1,14 @@
+import enum
 import os
 
 from backend.config import settings
 from .base_llm import BaseLLM
+
+class TableType(str, enum.Enum):
+    personal = "personal"
+    measured = "measured"
+    summary = "summary"
+    other = "other"
 
 
 class TableParseRouter(BaseLLM):
@@ -45,7 +52,7 @@ class TableParseRouter(BaseLLM):
             - other: 其它类，一般是健康小知识或医师信息等
         '''
         if not table_data:
-            return "other"
+            return TableType.other
 
         prompt = self._load_prompt()
 
@@ -65,17 +72,21 @@ class TableParseRouter(BaseLLM):
             # 解析 JSON
             parsed_result = self._parse_json_response(content)
 
-            if "answer" in parsed_result and \
-                    parsed_result["answer"] in ["personal", "measured", "summary", "other"]:
+            answer_val = parsed_result.get("answer")
+            if answer_val and answer_val in [t.value for t in TableType]:
                 break
 
             times -= 1
 
-        if "answer" in parsed_result and \
-                parsed_result["answer"] in ["personal", "measured", "summary", "other"]:
-            return parsed_result["answer"]
-        else:
-            return "other"
+        # 尝试将字符串转换为枚举对象
+        if parsed_result and parsed_result.get("answer"):
+            try:
+                return TableType(parsed_result["answer"])
+            except ValueError:
+                # 如果 LLM 抽风返回了不在定义里的值，捕获异常并兜底
+                return TableType.other
+        
+        return TableType.other
 
 
 # 获取环境变量
