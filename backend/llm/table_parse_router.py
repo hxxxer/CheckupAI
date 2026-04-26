@@ -36,7 +36,7 @@ class TableParseRouter(BaseLLM):
             enable_thinking=enable_thinking
         )
 
-    def router(self, table_data: dict) -> str:
+    def router(self, table_data: dict) -> list[TableType]:
         '''
         使用 LLM 分类表格类型
         :param table_data: table_html_to_md 返回的结构化数据中的表格，包含：
@@ -45,14 +45,14 @@ class TableParseRouter(BaseLLM):
             - is_double_column: 是否双栏
             - markdown: Markdown 字符串
             - html: HTML 字符串
-        :return: 分类后的类型，用字符串表示，包含：
+        :return: 分类后的类型列表，用枚举类表示，包含：
             - personal: 个人信息类
             - measured: 检验数值类
             - summary: 小结建议类
             - other: 其它类，一般是健康小知识或医师信息等
         '''
         if not table_data:
-            return TableType.other
+            return [TableType.other]
 
         prompt = self._load_prompt()
 
@@ -80,13 +80,16 @@ class TableParseRouter(BaseLLM):
 
         # 尝试将字符串转换为枚举对象
         if parsed_result and parsed_result.get("answer"):
-            try:
-                return TableType(parsed_result["answer"])
-            except ValueError:
-                # 如果 LLM 抽风返回了不在定义里的值，捕获异常并兜底
-                return TableType.other
+            type_results = []
+            for res in parsed_result["answer"]:
+                try:
+                    type_results.append(TableType(res))
+                except ValueError:
+                    # 如果 LLM 抽风返回了不在定义里的值，捕获异常并兜底
+                    if TableType.other not in type_results:
+                        type_results.append(TableType.other)
         
-        return TableType.other
+        return type_results if type_results else TableType.other
 
 
 # 获取环境变量

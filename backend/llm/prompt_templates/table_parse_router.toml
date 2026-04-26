@@ -13,13 +13,14 @@ role = "你是一个专业的医疗数据分类助手。任务是根据体检报
 2. 如果表格中包含测量信息（如身高、体重、血压、血脂等），请将表格分类为 "measured"。
 3. 如果表格中包含摘要信息（如检查结果、诊断、建议等），请将表格分类为 "summary"。
 4. 如果表格中包含其他信息（如检查医生、检查机构、健康小知识等），请将表格分类为 "other"。
+5. 如果表格中包含多种信息，比如同时有测量信息和个人信息，则都写入列表内。
 '''
 
 
 [output]
 title = "请输出一个包含以下结构的 JSON 对象："
 description = '''
-{"answer": "分类结果（"personal" | "measured" | "summary" | "other"）"}
+{"answer": [分类结果（"personal | "measured" | "summary" | "other"）]}
 '''
 
 [examples.1]
@@ -37,7 +38,7 @@ input = """
 | 体检日期 | 2023-10-22 |
 """
 output = '''
-{"answer": "personal"}
+{"answer": ["personal"]}
 '''
 
 [examples.2]
@@ -54,7 +55,7 @@ input = """
 | 低密度脂蛋白 | 3.5 | mmol/L | 2.1-3.4 |
 """
 output = '''
-{"answer": "measured"}
+{"answer": ["measured"]}
 '''
 
 [examples.3]
@@ -66,7 +67,7 @@ input = """
 3. 血压正常高值：注意监测血压，保持良好生活习惯
 """
 output = '''
-{"answer": "summary"}
+{"answer": ["summary"]}
 '''
 
 [examples.4]
@@ -83,7 +84,22 @@ input = """
 主检医师：李四    审核医师：王五
 """
 output = '''
-{"answer": "other"}
+{"answer": ["other"]}
+'''
+
+[examples.5]
+title = "同时含有个人信息和建议信息"
+input = """
+【Markdown】:
+
+| 姓名:雷盛瑜 性别:男 年龄:70岁 | 科室:门诊 | 床号: | 住院号: |
+| --- | --- | --- | --- |
+| 检查部位:肝脏胆囊胰腺脾脏肾脏输尿管膀胱前列腺 | 仪器:AVIUS L |
+| 肝脏:右叶最大斜径约14.9cm，肝脏包膜光滑，实质回声欠均匀，右叶见大小约15.9x13.0cm欠均质稍强回声团，边界不清（为多数融合）。|
+| 检查提示（此报告仅反映受检者当时检查情况，仅供参考） |
+"""
+output = '''
+{"answer": ["personal", "summary"]}
 '''
 
 [task]
