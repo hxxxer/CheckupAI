@@ -50,6 +50,7 @@ Thumbs.db
 *.docx
 *.doc
 *.json
+!medical_terms_map.json
 
 # Model Files (too large for git)
 *.pth
