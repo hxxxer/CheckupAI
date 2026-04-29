@@ -78,7 +78,7 @@ input = """
 """
 output = '''
 {
-  "title": "尿常规”,
+  "title": "尿常规",
   "table": [
     {"item": "蛋白质", "result": "45", "unit": "U/L", "reference_range": "0-40", "abnormal": "↑"},
     {"item": "白细胞", "result": "28", "unit": "U/L", "reference_range": "0-40", "abnormal": null}
