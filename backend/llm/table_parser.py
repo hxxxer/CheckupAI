@@ -2,7 +2,7 @@ import json
 import os
 import re
 import tomllib
-from typing import Any, Union
+from typing import Any, Union, Dict, List
 
 from openai import OpenAI
 
@@ -35,6 +35,55 @@ class TableParserLLM(BaseLLM):
             model=model,
             enable_thinking=enable_thinking
         )
+        # 加载医学名词映射表
+        self.medical_terms_map = self._load_medical_terms_map()
+
+    def _load_medical_terms_map(self) -> Dict[str, str]:
+        """
+        加载医学名词统一化映射表
+        """
+        map_file_path = os.path.join(os.path.dirname(__file__), "medical_terms_map.json")
+        if os.path.exists(map_file_path):
+            try:
+                with open(map_file_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"警告：加载医学名词统一表失败 {e}")
+                return {}
+        return {}
+
+    def normalize_item(self, raw_item: str) -> str:
+        """将原始 item 名称转换为标准名称，若无映射则保留原值（或可改为 None/自定义）"""
+        if raw_item is None or not isinstance(raw_item, str):
+            return raw_item
+        
+        # 去除首尾空格，可考虑大小写归一化
+        cleaned = raw_item.strip()
+        if not cleaned:
+            return raw_item
+        
+        return self.medical_terms_map.get(cleaned, raw_item)  # 找不到则返回原值
+
+    def normalize_json(self, input_json: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        对解析结果中的医学名词进行统一化
+        针对 LLM 输出格式 {"title": ..., "table": ["item": ..., ...]} 进行优化
+        """
+        if not self.medical_terms_map or not isinstance(input_json, dict):
+            return input_json
+        
+        output = input_json.copy()  # 浅拷贝，保留其他字段
+        if "table" in output and isinstance(output["table"], list):
+            new_table = []
+            for record in output["table"]:
+                if isinstance(record, dict) and "item" in record:
+                    record_copy = record.copy()
+                    record_copy["item"] = self.normalize_item(record["item"])
+                    new_table.append(record_copy)
+                else:
+                    new_table.append(record)  # 非预期结构则原样保留
+            output["table"] = new_table
+        return output
 
     def parse(self, table_data: dict) -> Union[list, None]:
         """
@@ -75,6 +124,10 @@ class TableParserLLM(BaseLLM):
         
         # 解析 JSON
         parsed_result = self._parse_json_response(content)
+
+        # 医学名词统一化
+        if parsed_result:
+            parsed_result = self.normalize_json(parsed_result)
 
         # print("提取结果:", content)
 
