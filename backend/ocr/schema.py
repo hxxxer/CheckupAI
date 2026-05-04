@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
+from backend.llm import TableType
+
 
 @dataclass
 class RawBlock:
@@ -111,6 +113,9 @@ class Table:
     index: int  # block 序号
     title: str  # 表格标题，如"血常规"
     items: list[TableItem] = field(default_factory=list)
+    raw_md: str | None = None
+    raw_html: str | None = None
+    types: list[TableType] = field(default_factory=list)
 
 
 @dataclass
