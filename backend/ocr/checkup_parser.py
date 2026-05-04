@@ -33,9 +33,9 @@ def parse_checkup(input_path: str, runner: Optional[PaddleOCRRunner] = None) -> 
     parser = UniversalParser()
     structured_data = parser.parse(raw_outputs)
 
-    text_analyzer.analyze(structured_data)
+    fin_data = text_analyzer.analyze(structured_data)
 
-    return structured_data
+    return fin_data
 
 
 # 测试

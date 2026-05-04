@@ -51,9 +51,9 @@ class TextAnalyzer:
     def analyze(
         self,
         ocr_results: List[OCRResult]
-    ) -> None:
+    ) -> List[OCRResult]:
         """
-        分析 OCR 结果中的文本内容，且原地修改 OCR 结果
+        分析 OCR 结果中的文本内容
 
         Args:
             ocr_results: OCR 解析结果列表
@@ -62,6 +62,8 @@ class TextAnalyzer:
             # 逐页分析
             for page in ocr_result.pages:
                 page.text_analyses = self._analyze_page(page)
+
+        return ocr_results
 
     def _analyze_page(self, page: Page) -> TextAnalysis:
         """
