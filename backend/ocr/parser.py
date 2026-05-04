@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List
 
-from backend.llm import table_parser
+from backend.llm import table_parser, table_parse_router, TableType
 from backend.ocr import (
     Image,
     OCRResult,
@@ -120,15 +120,25 @@ class UniversalParser:
                             tables_md["tables"][0]["context"] = context_text
 
                     for table_md in tables_md["tables"]:
-                        llm_result = table_parser.parse(table_md)
-                        # 转换为 Table 对象
-                        if llm_result:
+                        table_types = table_parse_router.router(table_md)
+                        if TableType.measured in table_types:
+                            llm_result = table_parser.parse(table_md)
+                            # 转换为 Table 对象
+                            if llm_result:
+                                table_obj = Table(
+                                    index=block.block_id,
+                                    title=llm_result.get('title', '') if isinstance(llm_result, dict) else '',
+                                    items=self._build_table_items(llm_result) if isinstance(llm_result, dict) else [],
+                                    raw_md=table_md["markdown"],
+                                    types=table_types
+                                )
+                        else:
                             table_obj = Table(
                                 index=block.block_id,
-                                title=llm_result.get('title', '') if isinstance(llm_result, dict) else '',
-                                items=self._build_table_items(llm_result) if isinstance(llm_result, dict) else []
+                                raw_md=table_md["markdown"],
+                                types=table_types
                             )
-                            tables.append(table_obj)
+                        tables.append(table_obj)
 
 
             elif block.label == "image":
