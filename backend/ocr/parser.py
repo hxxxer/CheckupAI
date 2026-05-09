@@ -104,10 +104,24 @@ class UniversalParser:
                 )
                 if not first_table_found:
                     context_before_table.append(block)
-
             elif block.label == "table":
                 first_table_found = True
                 table_html = block.content
+                
+                # 检查表格内是否有内嵌图片（兼容不同OCR引擎）
+                embedded_images = self._extract_embedded_images_from_table(
+                    table_html, raw_page.image_paths
+                )
+                if embedded_images:
+                    for img_path in embedded_images:
+                        images.append(
+                            Image(
+                                index=block.block_id,
+                                image_path=img_path,
+                                bbox=None,
+                            )
+                        )
+
                 table_html = table_html_clean(table_html)
                 tables_md = table_html_to_md(table_html)
 
@@ -115,7 +129,8 @@ class UniversalParser:
                     # 只给第一个表格添加上下文（每个页面独立处理）
                     if len(tables) == 0 and context_text is None:
                         # 过滤 context 内容
-                        context_text = self._filter_context_text(context_before_table)
+                        context_text = self._filter_context_text(
+                            context_before_table)
                         if context_text:
                             tables_md["tables"][0]["context"] = context_text
 
@@ -127,8 +142,10 @@ class UniversalParser:
                             if llm_result:
                                 table_obj = Table(
                                     index=block.block_id,
-                                    title=llm_result.get('title', '') if isinstance(llm_result, dict) else '',
-                                    items=self._build_table_items(llm_result) if isinstance(llm_result, dict) else [],
+                                    title=llm_result.get('title', '') if isinstance(
+                                        llm_result, dict) else '',
+                                    items=self._build_table_items(
+                                        llm_result) if isinstance(llm_result, dict) else [],
                                     raw_md=table_md["markdown"],
                                     types=table_types
                                 )
@@ -139,17 +156,17 @@ class UniversalParser:
                                 types=table_types
                             )
                         tables.append(table_obj)
-
-
             elif block.label == "image":
-                img_path = self._match_image_path(raw_page.image_paths, block.bbox)
-                images.append(
-                    Image(
-                        index=block.block_id,
-                        image_path=img_path,
-                        bbox=block.bbox,
+                img_path = self._match_image_path(
+                    raw_page.image_paths, block.bbox)
+                if img_path:
+                    images.append(
+                        Image(
+                            index=block.block_id,
+                            image_path=img_path,
+                            bbox=block.bbox,
+                        )
                     )
-                )
 
         return Page(
             page_index=raw_page.page_index,
@@ -268,20 +285,48 @@ class UniversalParser:
         if not bbox or not image_paths:
             return ""
 
+        bbox_text = "_".join(str(x) for x in bbox)
         for img_path in image_paths:
             img_name = os.path.basename(img_path)
 
-            # 提取 bbox 数字：img_in_image_box_77_15_776_877.jpg -> [77, 15, 776, 877]
             name_without_ext = os.path.splitext(img_name)[0]
-            parts = name_without_ext.split('_')
 
-            if len(parts) >= 6 and name_without_ext.startswith("img_in_image_box_"):
-                img_bbox = list(map(int, parts[-4:]))
-                if img_bbox == bbox:
-                    return img_path
+            if name_without_ext.endswith(bbox_text):
+                return img_path
 
-        # 如果没有精确匹配，返回第一个
-        return image_paths[0] if image_paths else ""
+        return ""
+    
+    @staticmethod
+    def _extract_embedded_images_from_table(table_content: str, image_paths: List[str]) -> List[Dict[str, str]]:
+        """
+        从表格内容中提取内嵌图片的路径（兼容不同OCR引擎）
+        
+        通过暴力匹配 image_paths 中每个文件的 basename 来查找表格中引用的图片
+
+        Args:
+            table_content: 表格的 HTML 或文本内容
+            image_paths: 页面图片路径列表
+
+        Returns:
+            匹配到的图片路径列表
+        """
+        import os
+        
+        if not table_content or not image_paths:
+            return []
+        
+        embedded_images = []
+        
+        # 遍历所有图片路径，检查其文件名是否出现在表格内容中
+        for img_path in image_paths:
+            img_filename = os.path.basename(img_path)
+            
+            # 检查文件名是否在表格内容中出现
+            if img_filename in table_content:
+                # 尝试找到文件名的引用位置（可能是完整路径或只是文件名）
+                embedded_images.append(img_path)
+        
+        return embedded_images
 
     @staticmethod
     def _extract_file_format(file_path: str) -> str:
