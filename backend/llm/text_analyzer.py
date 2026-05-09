@@ -7,6 +7,7 @@
 3. 生成健康总结
 """
 
+import heapq
 import json
 import os
 import tomllib
@@ -16,8 +17,10 @@ from typing import Any, Dict, List
 from openai import OpenAI
 
 from backend.config import settings
+from backend.ocr import (OCRResult, Page, PersonalInfo, PositiveFinding,
+                         TextAnalysis, TextRegion, Table)
+
 from .utils import safe_json_parse
-from backend.ocr import OCRResult, Page, TextAnalysis, PersonalInfo, PositiveFinding
 
 
 class TextAnalyzer:
@@ -70,7 +73,7 @@ class TextAnalyzer:
         分析单个页面的文本
 
         Args:
-            page: RawPage 对象
+            page: Page 对象
 
         Returns:
             TextAnalysis格式的分析结果
@@ -89,7 +92,7 @@ class TextAnalyzer:
 
         # 调用 LLM
         prompt = self._load_prompt()
-        
+
         content = self._call_llm(prompt, input_text)
 
         # 解析 JSON 结果
@@ -135,10 +138,17 @@ class TextAnalyzer:
             合并后的文本字符串
         """
         lines = []
-        for region in sorted(page.regions, key=lambda x: x.index):
-            text = region.text.strip()
-            if text:
-                lines.append(f"[{region.index}|{region.label}] {text}")
+        merged_region = heapq.merge(page.regions, page.tables, key=lambda x: x.index)
+        for region in merged_region:
+            if type(region) is TextRegion:
+                text = region.text.strip()
+                if text:
+                    lines.append(f"[{region.index}|文本({region.label})] {text}")
+            elif type(region) is Table:
+                text = region.raw_md.strip()
+                types = '+'.join(t.value for t in region.types)
+                if text:
+                    lines.append(f"[{region.index}|表格({types})]\n{text}")
 
         return "\n".join(lines)
 
