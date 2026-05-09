@@ -5,10 +5,10 @@ from backend.config import settings
 from .base_llm import BaseLLM
 
 class TableType(str, enum.Enum):
-    personal = "personal"
-    measured = "measured"
-    summary = "summary"
-    other = "other"
+    personal = "个人信息"
+    measured = "数值检验"
+    summary = "总结建议"
+    other = "其它"
 
 
 class TableParseRouter(BaseLLM):
