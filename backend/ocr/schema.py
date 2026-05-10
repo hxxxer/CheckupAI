@@ -111,7 +111,7 @@ class Table:
     """一张检验 / 检查表格。"""
 
     index: int  # block 序号
-    title: str  # 表格标题，如"血常规"
+    title: str | None = None  # 表格标题，如"血常规"
     items: list[TableItem] = field(default_factory=list)
     raw_md: str | None = None
     raw_html: str | None = None
