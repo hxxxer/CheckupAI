@@ -188,6 +188,60 @@ def split_by_headers(documents: List[Document]) -> List[Document]:
     return header_splits
 
 
+def split_by_html_semantic(
+    documents: List[Document],
+    chunk_size_tokens: int = 512,
+    chunk_overlap_tokens: int = 50,
+    save_format: str = "json"
+) -> List[Document]:
+    """
+    基于 HTML 语义进行文档分割
+    
+    Args:
+        documents: 清洗后的 HTML 文档列表
+        chunk_size_tokens: 每个分块的 token 数量
+        chunk_overlap_tokens: 分块重叠的 token 数量
+        save_format: 保存格式
+        
+    Returns:
+        分割后的文档列表
+    """
+    print("步骤: 基于 HTML 语义分割")
+    try:
+        headers_to_split_on = [
+            ("#", "Header_1"),
+            ("##", "Header_2"),
+            ("###", "Header_3"),
+            ("####", "Header_4"),
+        ]
+
+        html_splitter = HTMLSemanticPreservingSplitter(
+            headers_to_split_on=headers_to_split_on,
+            max_chunk_size=chunk_size_tokens,
+            chunk_overlap=chunk_overlap_tokens,
+            separators=["\n\n", "\n", "。", "！", "？", "；", "，", ".", "!", "?", ";", ",", " ", ""],
+            denylist_tags=["img"],
+            preserve_links=True
+        )
+        
+        html_splits = []
+        for doc in documents:
+             try:
+                 splits = html_splitter.split_text(doc.page_content)
+                 for split in splits:
+                     split.metadata.update(doc.metadata)
+                     if split.page_content.strip():
+                         html_splits.append(split)
+             except Exception as e:
+                 print(f"HTML 语义分割出错: {e}，跳过该文档。")
+
+        print(f"HTML 语义分割后得到 {len(html_splits)} 个片段")
+        return html_splits
+    except Exception as e:
+        print(f"警告: HTML 语义分割失败 ({e})。请确保安装了 langchain-experimental 且输入格式兼容。")
+        return []
+
+
 def save_chunks(
     documents: List[Document],
     output_dir: str,
@@ -238,7 +292,9 @@ def process_knowledge_base(
     chunk_size_tokens: int = 512,
     chunk_overlap_tokens: int = 50,
     save_format: str = "json",
-    model_path: str = None
+    model_path: str = None,
+    enable_header_split: bool = False,
+    enable_recursive_split: bool = False
 ) -> List[Document]:
     """
     完整的知识库处理流程（使用 Token 计数）
@@ -250,6 +306,8 @@ def process_knowledge_base(
         chunk_overlap_tokens: 分块重叠的 token 数量
         save_format: 保存格式 ('json' 或 'txt')
         model_path: Qwen 模型路径
+        enable_header_split: 是否启用按标题分割（可选，默认False）
+        enable_recursive_split: 是否启用递归字符分割（可选，默认False）
     
     Returns:
         分块后的文档列表
@@ -299,79 +357,70 @@ def process_knowledge_base(
     print(f"总 Token 数: {total_tokens:,}")
     print(f"平均每个字符的 Token 数: {avg_tokens_per_char:.3f}\n")
     
-    # --- 新增功能 1: HTML Semantic Splitting ---
-    print("步骤 2.5: 基于 HTML 语义分割 (参考方法)")
-    try:
-        headers_to_split_on = [
-            ("#", "Header_1"),
-            ("##", "Header_2"),
-            ("###", "Header_3"),
-            ("####", "Header_4"),
-        ]
-
-        html_splitter = HTMLSemanticPreservingSplitter(
-            headers_to_split_on=headers_to_split_on,
-            max_chunk_size=chunk_size_tokens,
-            chunk_overlap=chunk_overlap_tokens,
-            separators=["\n\n", "\n", "。", "！", "？", "；", "，", ".", "!", "?", ";", ",", " ", ""],
-            preserve_images=True, # 根据需求调整
-            preserve_links=True
-        )
-        
-        html_splits = []
-        for doc in html_cleaned_docs:
-             try:
-                 splits = html_splitter.split_text(doc.page_content)
-                 for split in splits:
-                     split.metadata.update(doc.metadata)
-                     if split.page_content.strip():
-                         html_splits.append(split)
-             except Exception as e:
-                 print(f"HTML 语义分割出错: {e}，跳过该文档。")
-
-        print(f"HTML 语义分割后得到 {len(html_splits)} 个片段")
-        save_chunks(html_splits, output_dir="./temp", sub_dir="split_by_html", format=save_format)
-        print("已保存 HTML 语义分割结果到 ./temp/split_by_html/")
-    except Exception as e:
-        print(f"警告: HTML 语义分割失败 ({e})。请确保安装了 langchain-experimental 且输入格式兼容。")
-
-    print()
-    
-    print("步骤 3: 按章节标题分割")
-    header_splits = split_by_headers(cleaned_docs)
-    
-    # --- 新增功能 2: 保存标题分割结果 ---
-    print("保存中间结果: 按标题分割的片段")
-    save_chunks(header_splits, output_dir="./temp", sub_dir="split_by_headers", format=save_format)
-    print("已保存标题分割结果到 ./temp/split_by_headers/")
-    print()
-    
-    print("步骤 4: 基于 Token 的递归分块")
-    text_splitter = RecursiveCharacterTextSplitter.from_huggingface_tokenizer(
-        tokenizer=tokenizer,
-        chunk_size=chunk_size_tokens,
-        chunk_overlap=chunk_overlap_tokens,
-        separators=["\n\n", "\n", "。", "！", "？", "；", "，", ".", "!", "?", ";", ",", " ", ""]
+    # --- 主要功能: HTML Semantic Splitting ---
+    final_chunks = split_by_html_semantic(
+        html_cleaned_docs, 
+        chunk_size_tokens, 
+        chunk_overlap_tokens, 
+        save_format
     )
     
-    final_chunks = text_splitter.split_documents(header_splits)
-    
-    for i, chunk in enumerate(final_chunks):
-        chunk.metadata["chunk_index"] = i % 1000
-        chunk.metadata["total_chunks"] = len(final_chunks)
-    
-    print(f"递归分割后得到 {len(final_chunks)} 个最终片段")
-    print()
-    
-    print("步骤 5: 保存分块结果")
-    save_chunks(final_chunks, output_dir, format=save_format)
+    # 保存主要结果到 final_chunks
+    if final_chunks:
+        print("保存主要结果: HTML 语义分割片段")
+        save_chunks(final_chunks, output_dir=output_dir, sub_dir=None, format=save_format)
+        print(f"已保存 HTML 语义分割结果到 {output_dir}/")
+    else:
+        print("警告: HTML 语义分割未产生任何片段。")
+
+    # --- 可选功能: Header Splitting & Recursive Splitting ---
+    if enable_header_split or enable_recursive_split:
+        print("\n--- 执行可选分割流程 ---")
+        
+        if enable_header_split:
+            print("步骤 3 (可选): 按章节标题分割")
+            header_splits = split_by_headers(cleaned_docs)
+            
+            print("保存中间结果: 按标题分割的片段")
+            save_chunks(header_splits, output_dir="./temp", sub_dir="split_by_headers", format=save_format)
+            print("已保存标题分割结果到 ./temp/split_by_headers/")
+            
+            current_splits = header_splits
+        else:
+            current_splits = cleaned_docs
+
+        if enable_recursive_split:
+            print("步骤 4 (可选): 基于 Token 的递归分块")
+            text_splitter = RecursiveCharacterTextSplitter.from_huggingface_tokenizer(
+                tokenizer=tokenizer,
+                chunk_size=chunk_size_tokens,
+                chunk_overlap=chunk_overlap_tokens,
+                separators=["\n\n", "\n", "。", "！", "？", "；", "，", ".", "!", "?", ";", ",", " ", ""]
+            )
+            
+            recursive_chunks = text_splitter.split_documents(current_splits)
+            
+            for i, chunk in enumerate(recursive_chunks):
+                chunk.metadata["chunk_index"] = i % 1000
+                chunk.metadata["total_chunks"] = len(recursive_chunks)
+            
+            print(f"递归分割后得到 {len(recursive_chunks)} 个最终片段")
+            
+            # 如果启用了可选分割，可以选择覆盖或追加保存，这里选择保存到 temp 以便区分
+            print("保存可选结果: 递归分割片段")
+            save_chunks(recursive_chunks, output_dir="./temp", sub_dir="split_recursive", format=save_format)
+            print(f"已保存递归分割结果到 ./temp/split_recursive/")
+            
+            # 注意：根据需求“其它降级”，主返回结果仍保持为 HTML 分割结果，
+            # 除非业务逻辑明确要求切换主结果源。此处保持 final_chunks 为 HTML 分割结果。
+            
     print()
     
     print("=" * 60)
     print("知识库处理完成！")
     print(f"输入文件: {input_dir}")
     print(f"输出目录: {output_dir}")
-    print(f"总分块数: {len(final_chunks)}")
+    print(f"总分块数 (HTML语义): {len(final_chunks)}")
     print(f"每块 Token 数: {chunk_size_tokens}")
     print(f"重叠 Token 数: {chunk_overlap_tokens}")
     print("=" * 60)
@@ -389,6 +438,8 @@ if __name__ == "__main__":
         chunk_size_tokens=512,
         chunk_overlap_tokens=50,
         save_format="json"
+        # enable_header_split=False, # 默认不执行
+        # enable_recursive_split=False # 默认不执行
     )
     
     print("\n示例分块预览:")
