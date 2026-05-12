@@ -1,13 +1,14 @@
 import os
 import re
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
-from langchain.text_splitter import (
-    RecursiveCharacterTextSplitter,
-    MarkdownHeaderTextSplitter,
-)
-from langchain.schema import Document
+import markdownify
+from langchain_core.documents import Document
+from langchain_text_splitter import (MarkdownHeaderTextSplitter,
+                                     RecursiveCharacterTextSplitter)
+from langchain_text_splitters.html import HTMLSemanticPreservingSplitter
+from lxml.html.clean import Cleaner
 from transformers import AutoTokenizer
 
 
@@ -91,17 +92,37 @@ def read_markdown_files(input_dir: str) -> List[Document]:
     return documents
 
 
-def clean_text(raw_text: str) -> str:
+def clean_html_tags(raw_html: str) -> str:
+    """
+    使用 lxml Cleaner 清理 HTML 标签和样式
+    
+    Args:
+        raw_html: 原始 HTML 文本
+        
+    Returns:
+        清理后的 HTML 文本（仅保留结构标签，去除样式等）
+    """
+    cleaner = Cleaner(style=True)
+    try:
+        cleaned_html = cleaner.clean_html(raw_html)
+        return cleaned_html
+    except Exception as e:
+        print(f"HTML 清理出错: {e}")
+        return raw_html
+
+
+def clean_text(text: str) -> str:
     """
     清洗文本：去除页眉页脚、页码、水印、多余空白等噪声
-
+    注意：此函数假设输入已经是 Markdown 或纯文本格式
+    
     Args:
-        raw_text: 原始文本
-
+        text: 原始文本（Markdown 或纯文本）
+        
     Returns:
         清洗后的文本
     """
-    text = raw_text
+    text = markdownify.markdownify(text, table_infer_header=True)
 
     # 移除常见页眉页脚模式（如“国家卫生健康委员会”、“第x页”等）
     footer_patterns = [
@@ -170,9 +191,13 @@ def split_by_headers(documents: List[Document]) -> List[Document]:
 def save_chunks(
     documents: List[Document],
     output_dir: str,
-    format: str = "json"
+    format: str = "json",
+    sub_dir: Optional[str] = None
 ) -> None:
     """保存分块结果到指定目录"""
+    if sub_dir:
+        output_dir = os.path.join(output_dir, sub_dir)
+    
     os.makedirs(output_dir, exist_ok=True)
     
     if format == "json":
@@ -243,10 +268,20 @@ def process_knowledge_base(
     
     print("步骤 2: 清洗文本内容")
     cleaned_docs = []
+    html_cleaned_docs = []
     total_chars = 0
     total_tokens = 0
     for doc in documents:
-        cleaned_content = clean_text(doc.page_content)
+        # 新增：先清理 HTML 标签和样式
+        html_cleaned_content = clean_html_tags(doc.page_content)
+        html_cleaned_docs.append(Document(
+            page_content=html_cleaned_content,
+            metadata=doc.metadata.copy()
+        ))
+        
+        # 再清洗文本噪声（此时输入已无复杂 HTML 样式）
+        cleaned_content = clean_text(html_cleaned_content)
+        
         cleaned_doc = Document(
             page_content=cleaned_content,
             metadata=doc.metadata.copy()
@@ -264,8 +299,51 @@ def process_knowledge_base(
     print(f"总 Token 数: {total_tokens:,}")
     print(f"平均每个字符的 Token 数: {avg_tokens_per_char:.3f}\n")
     
+    # --- 新增功能 1: HTML Semantic Splitting ---
+    print("步骤 2.5: 基于 HTML 语义分割 (参考方法)")
+    try:
+        headers_to_split_on = [
+            ("#", "Header_1"),
+            ("##", "Header_2"),
+            ("###", "Header_3"),
+            ("####", "Header_4"),
+        ]
+
+        html_splitter = HTMLSemanticPreservingSplitter(
+            headers_to_split_on=headers_to_split_on,
+            max_chunk_size=chunk_size_tokens,
+            chunk_overlap=chunk_overlap_tokens,
+            separators=["\n\n", "\n", "。", "！", "？", "；", "，", ".", "!", "?", ";", ",", " ", ""],
+            preserve_images=True, # 根据需求调整
+            preserve_links=True
+        )
+        
+        html_splits = []
+        for doc in html_cleaned_docs:
+             try:
+                 splits = html_splitter.split_text(doc.page_content)
+                 for split in splits:
+                     split.metadata.update(doc.metadata)
+                     if split.page_content.strip():
+                         html_splits.append(split)
+             except Exception as e:
+                 print(f"HTML 语义分割出错: {e}，跳过该文档。")
+
+        print(f"HTML 语义分割后得到 {len(html_splits)} 个片段")
+        save_chunks(html_splits, output_dir="./temp", sub_dir="split_by_html", format=save_format)
+        print("已保存 HTML 语义分割结果到 ./temp/split_by_html/")
+    except Exception as e:
+        print(f"警告: HTML 语义分割失败 ({e})。请确保安装了 langchain-experimental 且输入格式兼容。")
+
+    print()
+    
     print("步骤 3: 按章节标题分割")
     header_splits = split_by_headers(cleaned_docs)
+    
+    # --- 新增功能 2: 保存标题分割结果 ---
+    print("保存中间结果: 按标题分割的片段")
+    save_chunks(header_splits, output_dir="./temp", sub_dir="split_by_headers", format=save_format)
+    print("已保存标题分割结果到 ./temp/split_by_headers/")
     print()
     
     print("步骤 4: 基于 Token 的递归分块")
