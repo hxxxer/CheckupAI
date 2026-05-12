@@ -1,106 +1,48 @@
 """
-Reranker Module
-Uses BGE-reranker-v2-m3 for result reranking
+Reranker 模块
+使用 BGE-reranker-v2-m3 对检索结果重排序
+
+输入格式：documents 为 list[dict]，每项必须含 "text" 字段
 """
 
 from FlagEmbedding import FlagReranker
-import numpy as np
 
 
 class BGEReranker:
-    def __init__(self, model_name='BAAI/bge-reranker-v2-m3', use_fp16=True):
+    """BGE-Reranker 重排序器"""
+
+    def __init__(self, model_name: str = "BAAI/bge-reranker-v2-m3", use_fp16: bool = True):
+        self.reranker = FlagReranker(model_name, use_fp16=use_fp16)
+
+    def rerank(self, query: str, documents: list[dict], top_k: int | None = None) -> list[dict]:
         """
-        Initialize BGE reranker
-        
+        对文档列表重排序
+
         Args:
-            model_name: Reranker model name
-            use_fp16: Whether to use FP16 for faster inference
-        """
-        self.reranker = FlagReranker(
-            model_name,
-            use_fp16=use_fp16
-        )
-    
-    def rerank(self, query, documents, top_k=None):
-        """
-        Rerank documents based on query
-        
-        Args:
-            query: Query text
-            documents: List of document dicts with 'text' field
-            top_k: Number of top results to return (None returns all)
-            
+            query: 查询文本
+            documents: 文档列表，每项必须含 "text" 字段
+            top_k: 返回前 k 条，None 则返回全部
+
         Returns:
-            list: Reranked documents with scores
+            重排序后的文档列表，增加 "rerank_score" 字段
         """
         if not documents:
             return []
-        
-        # Prepare query-document pairs
-        pairs = [[query, doc.get('text', '')] for doc in documents]
-        
-        # Get reranking scores
+
+        pairs = [[query, doc.get("text", "")] for doc in documents]
         scores = self.reranker.compute_score(pairs, normalize=True)
-        
-        # Handle single document case (score is float, not list)
+
         if isinstance(scores, float):
             scores = [scores]
-        
-        # Combine documents with scores
+
         reranked = []
         for doc, score in zip(documents, scores):
             doc_copy = doc.copy()
-            doc_copy['rerank_score'] = float(score)
+            doc_copy["rerank_score"] = float(score)
             reranked.append(doc_copy)
-        
-        # Sort by rerank score (descending)
-        reranked.sort(key=lambda x: x['rerank_score'], reverse=True)
-        
-        # Return top_k if specified
+
+        reranked.sort(key=lambda x: x["rerank_score"], reverse=True)
+
         if top_k:
             return reranked[:top_k]
-        
         return reranked
-    
-    def rerank_with_threshold(self, query, documents, threshold=0.5, top_k=None):
-        """
-        Rerank documents and filter by threshold
-        
-        Args:
-            query: Query text
-            documents: List of document dicts
-            threshold: Minimum rerank score to include
-            top_k: Maximum number of results
-            
-        Returns:
-            list: Filtered and reranked documents
-        """
-        reranked = self.rerank(query, documents, top_k=None)
-        
-        # Filter by threshold
-        filtered = [doc for doc in reranked if doc['rerank_score'] >= threshold]
-        
-        # Apply top_k limit
-        if top_k:
-            return filtered[:top_k]
-        
-        return filtered
-    
-    def batch_rerank(self, queries, documents_list, top_k=None):
-        """
-        Rerank multiple query-document sets in batch
-        
-        Args:
-            queries: List of query texts
-            documents_list: List of document lists
-            top_k: Number of top results per query
-            
-        Returns:
-            list: List of reranked document lists
-        """
-        results = []
-        for query, documents in zip(queries, documents_list):
-            reranked = self.rerank(query, documents, top_k=top_k)
-            results.append(reranked)
-        
-        return results

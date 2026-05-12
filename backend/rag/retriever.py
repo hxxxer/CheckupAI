@@ -1,199 +1,234 @@
 """
-Dual-Path Retriever
-Combines knowledge base retrieval with user profile retrieval
-Uses BGE-M3 for embedding and BGE-reranker-v2-m3 for reranking
+MedicalRAG — 三路检索编排
+
+检索流程：
+1. QueryRewriter 改写查询 + 判断是否需要报告 + 联想指标
+2. 指标统一化（复用 medical_terms_map.json）
+3. 三路并行检索：
+   A. report_items 精确匹配 → 全部返回
+   B. report_pages 向量检索 → 按 exam_date 取最近一份
+   C. knowledge_chunks + medical_qa 向量检索 → rerank → 各取 top 3
 """
 
-from pymilvus import connections, Collection
-from FlagEmbedding import BGEM3FlagModel
-import numpy as np
+from typing import Any, Dict, List
+
+from pymilvus import MilvusClient
+
+from backend.llm import QueryRewriter
+from backend.llm.utils import medical_term_normalizer
+from backend.vector.config import MilvusLiteConfig
+from backend.vector.embeddings import BGEM3Embedder
+
 from .reranker import BGEReranker
 
 
-class DualPathRetriever:
-    def __init__(self, 
-                 milvus_host='localhost',
-                 milvus_port='19530',
-                 embedding_model='BAAI/bge-m3',
-                 reranker_model='BAAI/bge-reranker-v2-m3',
-                 use_reranker=True):
-        """
-        Initialize dual-path retriever
-        
-        Args:
-            milvus_host: Milvus server host
-            milvus_port: Milvus server port
-            embedding_model: BGE-M3 embedding model
-            reranker_model: BGE reranker model
-            use_reranker: Whether to use reranker for result refinement
-        """
-        # Connect to Milvus
-        connections.connect(host=milvus_host, port=milvus_port)
-        
-        # Initialize BGE-M3 embedding model
-        self.encoder = BGEM3FlagModel(embedding_model, use_fp16=True)
-        
-        # Initialize reranker
-        self.use_reranker = use_reranker
-        if use_reranker:
-            self.reranker = BGEReranker(reranker_model, use_fp16=True)
-        else:
-            self.reranker = None
-        
-        # Collection names
-        self.knowledge_collection_name = 'medical_knowledge'
-        self.profile_collection_name = 'user_profiles'
-        
-        # Load collections
+class MedicalRAG:
+    """体检报告 RAG 检索器"""
+
+    def __init__(
+        self,
+        client: MilvusClient,
+        embedder: BGEM3Embedder | None = None,
+        query_rewriter: QueryRewriter | None = None,
+        reranker: BGEReranker | None = None,
+    ):
+        self.client = client
+        self.cfg = MilvusLiteConfig()
+        self.embedder = embedder or BGEM3Embedder()
+        self.query_rewriter = query_rewriter  # lazily loaded
+        self.reranker = reranker or BGEReranker()
+
+    def _get_query_rewriter(self) -> QueryRewriter:
+        if self.query_rewriter is None:
+            from backend.llm import query_rewriter as qr
+            self.query_rewriter = qr
+        return self.query_rewriter
+
+    def _normalize_indicators(self, indicators: List[str]) -> List[str]:
+        """用 MedicalTermNormalizer 统一化指标名"""
+        return medical_term_normalizer.normalize_list(indicators)
+
+    def _get_embedding(self, text: str) -> List[float]:
+        return self.embedder.encode_dense([text])[0]
+
+    # ---------- 路径 A: report_items 精确匹配 ----------
+
+    def _retrieve_report_items(self, indicators: List[str]) -> List[Dict]:
+        """返回全部匹配的检验项目"""
+        if not indicators:
+            return []
+
+        all_items = []
+        seen = set()
+
+        for ind in indicators:
+            try:
+                results = self.client.query(
+                    collection_name=self.cfg.COLLECTION_REPORT_ITEMS,
+                    expr=f'item == "{ind}"',
+                    output_fields=["*"],
+                )
+                for row in results:
+                    key = f"{row.get('report_source')}_{row.get('page_index')}_{row.get('item')}"
+                    if key not in seen:
+                        seen.add(key)
+                        all_items.append(row)
+            except Exception as e:
+                print(f"[MedicalRAG] report_items 查询失败 (indicator={ind}): {e}")
+
+        return all_items
+
+    # ---------- 路径 B: report_pages 向量检索 ----------
+
+    def _retrieve_report_page(self, query_vec: List[float]) -> Dict | None:
+        """向量检索 report_pages → 按 exam_date 降序取最近一份"""
         try:
-            self.knowledge_collection = Collection(self.knowledge_collection_name)
-            self.profile_collection = Collection(self.profile_collection_name)
-            self.knowledge_collection.load()
-            self.profile_collection.load()
+            results = self.client.search(
+                collection_name=self.cfg.COLLECTION_REPORT_PAGES,
+                data=[query_vec],
+                anns_field="summary_dense",
+                limit=10,
+                output_fields=["*"],
+            )[0]  # 取第一条查询结果
         except Exception as e:
-            print(f"Collection loading error: {e}")
-            self.knowledge_collection = None
-            self.profile_collection = None
-    
-    def encode_query(self, query):
-        """
-        Encode query text to embedding vector using BGE-M3
-        
-        Args:
-            query: Query text
-            
-        Returns:
-            numpy array: Dense embedding vector
-        """
-        # BGE-M3 returns dict with 'dense_vecs', 'lexical_weights', 'colbert_vecs'
-        embeddings = self.encoder.encode([query])
-        # Use dense vectors for Milvus search
-        return embeddings['dense_vecs'][0]
-    
-    def retrieve_from_knowledge_base(self, query, top_k=5, rerank_top_k=None):
-        """
-        Retrieve relevant documents from knowledge base
-        
-        Args:
-            query: User query
-            top_k: Number of initial results to retrieve
-            rerank_top_k: Number of results after reranking (None = same as top_k)
-            
-        Returns:
-            list: Retrieved and optionally reranked documents
-        """
-        if not self.knowledge_collection:
-            return []
-        
-        # Retrieve more candidates for reranking
-        retrieve_k = top_k * 3 if self.use_reranker else top_k
-        
-        query_embedding = self.encode_query(query)
-        
-        search_params = {
-            "metric_type": "IP",
-            "params": {"nprobe": 10}
-        }
-        
-        results = self.knowledge_collection.search(
-            data=[query_embedding.tolist()],
-            anns_field="embedding",
-            param=search_params,
-            limit=retrieve_k,
-            output_fields=["text", "source", "metadata"]
+            print(f"[MedicalRAG] report_pages 向量检索失败: {e}")
+            return None
+
+        if not results:
+            return None
+
+        # 提取实体，按 exam_date 降序
+        hits_with_date = []
+        for hit in results:
+            entity = hit.get("entity", {}) if isinstance(hit, dict) else {}
+            if not entity:
+                continue
+            exam_date = entity.get("exam_date", "")
+            hits_with_date.append((exam_date, entity))
+
+        # exam_date 降序，空日期排最后
+        hits_with_date.sort(
+            key=lambda x: (x[0] if x[0] else ""),
+            reverse=True,
         )
-        
-        documents = []
-        for hits in results:
-            for hit in hits:
-                documents.append({
-                    'text': hit.entity.get('text'),
-                    'source': hit.entity.get('source'),
-                    'metadata': hit.entity.get('metadata'),
-                    'score': hit.score
-                })
-        
-        # Apply reranking if enabled
-        if self.use_reranker and self.reranker and documents:
-            final_k = rerank_top_k if rerank_top_k is not None else top_k
-            documents = self.reranker.rerank(query, documents, top_k=final_k)
-        
-        return documents
-    
-    def retrieve_from_user_profile(self, user_id, query, top_k=3, rerank_top_k=None):
-        """
-        Retrieve relevant information from user profile
-        
-        Args:
-            user_id: User identifier
-            query: User query
-            top_k: Number of initial results to retrieve
-            rerank_top_k: Number of results after reranking
-            
-        Returns:
-            list: Retrieved and optionally reranked profile information
-        """
-        if not self.profile_collection:
+
+        return hits_with_date[0][1] if hits_with_date else None
+
+    # ---------- 路径 C: 向量检索 + rerank ----------
+
+    def _retrieve_and_rerank(
+        self,
+        query: str,
+        query_vec: List[float],
+        collection: str,
+        anns_field: str,
+        output_fields: List[str],
+        retrieve_k: int = 10,
+        rerank_k: int = 3,
+        text_field: str = "text",
+    ) -> List[Dict]:
+        """通用：向量检索 → 转为通用格式 → rerank → top k"""
+        try:
+            results = self.client.search(
+                collection_name=collection,
+                data=[query_vec],
+                anns_field=anns_field,
+                limit=retrieve_k,
+                output_fields=output_fields,
+            )[0]
+        except Exception as e:
+            print(f"[MedicalRAG] {collection} 检索失败: {e}")
             return []
-        
-        # Retrieve more candidates for reranking
-        retrieve_k = top_k * 3 if self.use_reranker else top_k
-        
-        query_embedding = self.encode_query(query)
-        
-        search_params = {
-            "metric_type": "IP",
-            "params": {"nprobe": 10}
-        }
-        
-        # Search with user_id filter
-        expr = f'user_id == "{user_id}"'
-        
-        results = self.profile_collection.search(
-            data=[query_embedding.tolist()],
-            anns_field="embedding",
-            param=search_params,
-            limit=retrieve_k,
-            expr=expr,
-            output_fields=["text", "timestamp", "report_type"]
-        )
-        
-        profile_data = []
-        for hits in results:
-            for hit in hits:
-                profile_data.append({
-                    'text': hit.entity.get('text'),
-                    'timestamp': hit.entity.get('timestamp'),
-                    'report_type': hit.entity.get('report_type'),
-                    'score': hit.score
-                })
-        
-        # Apply reranking if enabled
-        if self.use_reranker and self.reranker and profile_data:
-            final_k = rerank_top_k if rerank_top_k is not None else top_k
-            profile_data = self.reranker.rerank(query, profile_data, top_k=final_k)
-        
-        return profile_data
-    
-    def dual_retrieve(self, query, user_id=None, knowledge_k=5, profile_k=3):
+
+        if not results:
+            return []
+
+        docs = []
+        for hit in results:
+            entity = hit.get("entity", {}) if isinstance(hit, dict) else {}
+            if not entity:
+                continue
+            doc = dict(entity)
+            doc["text"] = doc.get(text_field, "")
+            doc["_distance"] = hit.get("distance", 0) if isinstance(hit, dict) else 0
+            docs.append(doc)
+
+        return self.reranker.rerank(query, docs, top_k=rerank_k)
+
+    # ---------- 主入口 ----------
+
+    def retrieve(self, query: str) -> Dict[str, Any]:
         """
-        Perform dual-path retrieval
-        
+        执行三路检索
+
         Args:
-            query: User query
-            user_id: User identifier (optional)
-            knowledge_k: Number of knowledge base results
-            profile_k: Number of user profile results
-            
+            query: 用户原始输入（口语化）
+
         Returns:
-            dict: Combined retrieval results
+            {
+                "rewritten_query": str,
+                "need_report": bool,
+                "indicators": [str, ...],
+                "report_items": [dict, ...],
+                "report_page": dict | None,
+                "knowledge_chunks": [dict, ...],
+                "medical_qa": [dict, ...],
+            }
         """
-        results = {
-            'knowledge': self.retrieve_from_knowledge_base(query, knowledge_k),
-            'profile': []
+        # Step 1: 查询改写
+        qr = self._get_query_rewriter()
+        rewrite_result = qr.rewrite(query)
+
+        rewritten = rewrite_result["rewritten"]
+        need_report = rewrite_result["need_report"]
+        raw_indicators = rewrite_result["indicators"]
+
+        # Step 2: 指标统一化
+        indicators = self._normalize_indicators(raw_indicators)
+
+        # Step 3: 生成向量（一次，共用）
+        query_vec = self._get_embedding(rewritten)
+
+        # 路径 A: 精确匹配 report_items
+        report_items = []
+        if need_report and indicators:
+            report_items = self._retrieve_report_items(indicators)
+
+        # 路径 B: 向量检索 report_pages → 最近一份
+        report_page = None
+        if need_report:
+            report_page = self._retrieve_report_page(query_vec)
+
+        # 路径 C1: knowledge_chunks
+        knowledge_chunks = self._retrieve_and_rerank(
+            query=rewritten,
+            query_vec=query_vec,
+            collection=self.cfg.COLLECTION_KNOWLEDGE_CHUNKS,
+            anns_field="content_dense",
+            output_fields=["content", "source", "filename"],
+            retrieve_k=10,
+            rerank_k=3,
+            text_field="content",
+        )
+
+        # 路径 C2: medical_qa
+        medical_qa = self._retrieve_and_rerank(
+            query=rewritten,
+            query_vec=query_vec,
+            collection=self.cfg.COLLECTION_MEDICAL_QA,
+            anns_field="summary_dense",
+            output_fields=["summary", "document", "department", "text"],
+            retrieve_k=10,
+            rerank_k=3,
+            text_field="document",
+        )
+
+        return {
+            "rewritten_query": rewritten,
+            "need_report": need_report,
+            "indicators": indicators,
+            "report_items": report_items,
+            "report_page": report_page,
+            "knowledge_chunks": knowledge_chunks,
+            "medical_qa": medical_qa,
         }
-        
-        if user_id:
-            results['profile'] = self.retrieve_from_user_profile(user_id, query, profile_k)
-        
-        return results
