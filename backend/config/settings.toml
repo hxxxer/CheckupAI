@@ -32,5 +32,6 @@ output_format = "json"  # html/markdown/json
 table_prompt = "backend/llm/prompt_templates/table_parser.toml"
 text_prompt = "backend/llm/prompt_templates/text_analyzer.toml"
 table_parse_router_prompt = "backend/llm/prompt_templates/table_parse_router.toml"
+query_rewriter_prompt = "backend/llm/prompt_templates/query_rewriter.toml"
 max_retries = 3
 timeout_seconds = 120
