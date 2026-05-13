@@ -28,6 +28,9 @@ chainlit==1.0.0
 # LLM Integration
 openai==1.6.1
 
+# LangChain
+langchain-core>=0.2.0
+
 # Utilities
 python-dotenv==1.0.0
 pandas==2.1.4
