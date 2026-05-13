@@ -107,16 +107,17 @@ class PaddleOCRRunner:
                 page_json = None
 
                 # 收集该页面目录下的所有图片路径
-                for img_file in os.listdir(os.path.join(page_path, 'imgs')):
-                    if img_file.endswith(('.jpg', '.png', '.jpeg')):
-                        bbox = img_file.split('_')[-4:]
-                        if any(not i.isdigit() for i in bbox):
-                            continue
-                        bbox = [int(i) for i in bbox]
-                        sides = [(bbox[2] - bbox[0]), (bbox[3] - bbox[1])]
-                        if sides[0] * sides[1] < 100 or any(i < 50 for i in sides):  # 忽略过小的区域
-                            continue
-                        page_images.append(os.path.join(page_path, img_file))
+                if os.path.isdir("imgs"):
+                    for img_file in os.listdir(os.path.join(page_path, 'imgs')):
+                        if img_file.endswith(('.jpg', '.png', '.jpeg')):
+                            bbox = img_file.split('_')[-4:]
+                            if any(not i.isdigit() for i in bbox):
+                                continue
+                            bbox = [int(i) for i in bbox]
+                            sides = [(bbox[2] - bbox[0]), (bbox[3] - bbox[1])]
+                            if sides[0] * sides[1] < 100 or any(i < 50 for i in sides):  # 忽略过小的区域
+                                continue
+                            page_images.append(os.path.join(page_path, img_file))
 
                 # 加载 JSON 文件
                 for filename in os.listdir(page_path):
