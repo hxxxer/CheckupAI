@@ -127,6 +127,7 @@ def init_all_collections(
 def get_milvus_client(
     db_file: str | None = None,
     drop_existing: bool = False,
+    fresh_start: bool = False,
 ) -> MilvusClient:
     """
     获取初始化的 MilvusClient 并确保所有 Collection 就绪
@@ -134,6 +135,7 @@ def get_milvus_client(
     Args:
         db_file: Milvus Lite DB 文件路径，默认从 config 读取
         drop_existing: 是否删除已有 Collection 重建
+        fresh_start: 是否删除整个 DB 文件重新开始（解决残留锁问题）
 
     Returns:
         MilvusClient 实例
@@ -142,11 +144,35 @@ def get_milvus_client(
         db_file = MilvusLiteConfig.DB_FILE
 
     import os
+    import glob as _glob
+
     os.makedirs(os.path.dirname(db_file), exist_ok=True)
+
+    # 清理 SQLite WAL/SHM 残留（上次崩溃或未正常关闭导致）
+    for suffix in ("-wal", "-shm"):
+        companion = db_file + suffix
+        if os.path.isfile(companion):
+            try:
+                os.remove(companion)
+                print(f"[Milvus] 清理残留文件: {companion}")
+            except OSError:
+                pass
+
+    # 完全重建模式
+    if fresh_start and os.path.isfile(db_file):
+        try:
+            os.remove(db_file)
+            print(f"[Milvus] 删除旧数据库: {db_file}")
+            for suffix in ("-wal", "-shm"):
+                companion = db_file + suffix
+                if os.path.isfile(companion):
+                    os.remove(companion)
+        except OSError as e:
+            print(f"[Milvus] 无法删除旧数据库 ({e})，尝试继续...")
 
     client = MilvusClient(uri=db_file)
     print(f"[Milvus] 连接数据库: {db_file}")
 
-    init_all_collections(client, drop_existing=drop_existing)
+    init_all_collections(client, drop_existing=drop_existing or fresh_start)
 
     return client
