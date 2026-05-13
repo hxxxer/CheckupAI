@@ -164,7 +164,7 @@ def _auto_ingest_qa():
         print("[CheckupAI] medical_qa 已有数据，跳过")
         return
 
-    qa_csv_path = os.path.join(settings.project_root, "data", "qa.csv")
+    qa_csv_path = os.path.join(settings.project_root, "data/knowledge_base", "qa.csv")
     if not os.path.isfile(qa_csv_path):
         print(f"[CheckupAI] 提示：qa.csv 不存在 ({qa_csv_path})，跳过问答资料入库")
         return
