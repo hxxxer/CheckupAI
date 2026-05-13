@@ -109,6 +109,10 @@ class BaseScenario:
             parts.append(self._format_chunks(qa, "相关问答参考", "document"))
         return "\n".join(parts) if parts else "无相关检索资料"
 
-    def invoke(self, retrieval: Dict[str, Any], question: str) -> str:
+    def invoke(self, retrieval: Dict[str, Any], question: str, history: str = "") -> str:
         context = self.format_context(retrieval)
-        return self.chain.invoke({"context": context, "question": question})
+        return self.chain.invoke({
+            "history": history,
+            "context": context,
+            "question": question,
+        })

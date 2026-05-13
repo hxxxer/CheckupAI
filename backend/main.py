@@ -219,6 +219,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     question: str
+    history: str = ""
 
 
 class ChatResponse(BaseModel):
@@ -243,7 +244,7 @@ async def chat(request: ChatRequest):
 
     retrieval = _get_rag().retrieve(request.question)
     try:
-        answer = _get_chat_scenario().invoke(retrieval, request.question)
+        answer = _get_chat_scenario().invoke(retrieval, request.question, history=request.history)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 调用失败: {str(e)}")
 
@@ -258,7 +259,7 @@ async def generate_report(request: ChatRequest):
 
     retrieval = _get_rag().retrieve(request.question, skip_qa=True, knowledge_rerank_k=1)
     try:
-        report = _get_report_scenario().invoke(retrieval, request.question)
+        report = _get_report_scenario().invoke(retrieval, request.question, history=request.history)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 调用失败: {str(e)}")
 

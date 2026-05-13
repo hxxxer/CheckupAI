@@ -32,7 +32,7 @@ content = """
 
 [user]
 template = """
-检索资料：
+{history}检索资料：
 {context}
 
 用户请求：{question}

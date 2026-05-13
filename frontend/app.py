@@ -1,6 +1,6 @@
 """
 Chainlit Frontend for CheckupAI
-支持问答模式 / 报告生成模式切换
+支持问答模式 / 报告生成模式切换 + 对话记忆
 """
 
 import chainlit as cl
@@ -8,6 +8,8 @@ import aiohttp
 import os
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+MESSAGES_KEY = "chat_messages"
+MAX_HISTORY_ROUNDS = 6  # 最近 3 轮对话
 
 
 @cl.on_chat_start
@@ -21,6 +23,7 @@ async def start():
     ]).send()
 
     cl.user_session.set("report_mode", False)
+    cl.user_session.set(MESSAGES_KEY, [])
     await cl.Message(
         content="欢迎使用 CheckupAI 体检报告分析系统！\n\n"
         "请输入您的健康问题，我将结合体检报告和医学知识为您解答。\n"
@@ -48,9 +51,12 @@ async def main(message: cl.Message):
     report_mode = cl.user_session.get("report_mode", False)
     endpoint = "/api/report" if report_mode else "/api/chat"
 
+    messages = cl.user_session.get(MESSAGES_KEY, [])
+    history = _format_history(messages)
+
     try:
         async with aiohttp.ClientSession() as session:
-            payload = {"question": question}
+            payload = {"question": question, "history": history}
             async with session.post(
                 f"{API_URL}{endpoint}", json=payload
             ) as resp:
@@ -58,6 +64,11 @@ async def main(message: cl.Message):
                     result = await resp.json()
                     answer = result.get("answer", "")
                     retrieval = result.get("retrieval", {})
+
+                    # 追加到历史
+                    messages.append({"role": "用户", "content": question})
+                    messages.append({"role": "助手", "content": answer})
+                    cl.user_session.set(MESSAGES_KEY, messages)
 
                     formatted = _format_response(answer, retrieval, report_mode)
                     await cl.Message(content=formatted).send()
@@ -70,10 +81,21 @@ async def main(message: cl.Message):
         await thinking_msg.remove()
 
 
+def _format_history(messages: list[dict]) -> str:
+    if not messages:
+        return ""
+    recent = messages[-MAX_HISTORY_ROUNDS * 2:]  # 每轮 2 条 (user + assistant)
+    lines = ["对话历史："]
+    for m in recent:
+        lines.append(f"{m['role']}: {m['content']}")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 def _format_response(answer: str, retrieval: dict, report_mode: bool) -> str:
     """格式化回答和检索来源"""
     if report_mode:
-        return answer  # 报告模式直接返回，不附加元信息
+        return answer
 
     parts = [answer]
     rewritten = retrieval.get("rewritten_query", "")
