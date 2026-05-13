@@ -67,6 +67,10 @@ class Settings:
             (project_root / llm_config.get("table_parse_router_prompt", "")).resolve())
         self.llm_query_rewriter_prompt: str = str(
             (project_root / llm_config.get("query_rewriter_prompt", "")).resolve())
+        self.llm_chat_prompt: str = str(
+            (project_root / llm_config.get("chat_prompt", "")).resolve())
+        self.llm_report_prompt: str = str(
+            (project_root / llm_config.get("report_prompt", "")).resolve())
 
     def _validate_paths(self):
         """关键路径存在性校验"""
