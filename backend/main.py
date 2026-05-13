@@ -6,29 +6,26 @@ FastAPI + LangChain RAG Chain + Milvus Lite + vLLM
 1. 检查/初始化 Milvus Lite 向量数据库
 2. 若 report_pages 为空 → OCR 解析测试图片 → 入库
 3. 初始化 MedicalRAG（QueryRewriter + BGE-M3 + BGEReranker）
-4. 初始化 vLLM OpenAI 客户端
-5. 构建 LangChain Chain
+4. 初始化 ChatLLM（已在 backend.llm.chat_llm 模块级完成）
+5. 构建场景（ChatScenario + ReportScenario）
 6. 启动 FastAPI
 """
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableLambda
-
 from backend.config import settings
 from backend.llm import chat_llm
-from backend.rag import MedicalRAG, BGEReranker
+from backend.rag import MedicalRAG
+from backend.scenarios import ChatScenario, ReportScenario
 from backend.vector import get_milvus_client
 
 # ============================================================
-# 模块级启动：检查 DB → OCR 入库 → 初始化组件 → 构建 Chain
+# 模块级启动
 # ============================================================
 
 print("=" * 50)
@@ -73,6 +70,62 @@ if report_pages_empty:
 else:
     print("[CheckupAI] report_pages 已有数据，跳过 OCR")
 
+# ---- Step 2b: 若 knowledge_chunks 为空则从 chunks.json 入库 ----
+try:
+    count_result = client.query(
+        collection_name="knowledge_chunks",
+        expr="pk > 0",
+        output_fields=["pk"],
+        limit=1,
+    )
+    kc_empty = len(count_result) == 0
+except Exception:
+    kc_empty = True
+
+if kc_empty:
+    chunks_path = os.path.join(
+        settings.project_root, "data", "knowledge_base", "final_chunks", "chunks.json"
+    )
+    if os.path.isfile(chunks_path):
+        print(f"[CheckupAI] knowledge_chunks 为空，入库 chunks.json...")
+        try:
+            from backend.vector import ingest_knowledge_chunks
+            ingest_knowledge_chunks(client, chunks_path=str(chunks_path))
+            print("[CheckupAI] 知识库入库完成")
+        except Exception as e:
+            print(f"[CheckupAI] 警告：知识库入库失败 ({e})，跳过")
+    else:
+        print(f"[CheckupAI] 提示：chunks.json 不存在 ({chunks_path})，跳过知识库入库")
+else:
+    print("[CheckupAI] knowledge_chunks 已有数据，跳过")
+
+# ---- Step 2c: 若 medical_qa 为空则从 qa.csv 入库 ----
+try:
+    count_result = client.query(
+        collection_name="medical_qa",
+        expr="pk > 0",
+        output_fields=["pk"],
+        limit=1,
+    )
+    qa_empty = len(count_result) == 0
+except Exception:
+    qa_empty = True
+
+if qa_empty:
+    qa_csv_path = os.path.join(settings.project_root, "data", "qa.csv")
+    if os.path.isfile(qa_csv_path):
+        print(f"[CheckupAI] medical_qa 为空，入库 qa.csv...")
+        try:
+            from backend.vector import ingest_qa_from_csv
+            ingest_qa_from_csv(client, csv_path=str(qa_csv_path))
+            print("[CheckupAI] 问答资料入库完成")
+        except Exception as e:
+            print(f"[CheckupAI] 警告：问答资料入库失败 ({e})，跳过")
+    else:
+        print(f"[CheckupAI] 提示：qa.csv 不存在 ({qa_csv_path})，跳过问答资料入库")
+else:
+    print("[CheckupAI] medical_qa 已有数据，跳过")
+
 # ---- Step 3: 初始化 MedicalRAG ----
 print("[CheckupAI] 初始化 MedicalRAG...")
 rag = MedicalRAG(client)
@@ -81,36 +134,14 @@ print("[CheckupAI] MedicalRAG 就绪")
 # ---- Step 4: LLM 初始化（已在 backend.llm.chat_llm 模块级完成） ----
 print(f"[CheckupAI] LLM 就绪 (model={chat_llm.model})")
 
-# ---- Step 5: 构建 LangChain Chain ----
-
-SYSTEM_PROMPT = (
-    "你是一个专业的AI医疗健康助手，名字叫CheckupAI。\n"
-    "你的任务是基于提供的检索资料，为用户提供专业、准确、易懂的健康咨询回答。\n\n"
-    "要求：\n"
-    "1. 如果检索到了用户的体检报告数据，优先结合用户的个人指标进行分析\n"
-    "2. 引用权威医学知识时，标注来源\n"
-    "3. 如果检索资料不足以回答，请如实告知，不要编造\n"
-    "4. 回答末尾可以给出进一步的健康建议或就医指引\n"
-    "5. 严禁给出具体的药物处方或剂量建议"
-)
-
-PROMPT_TEMPLATE = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM_PROMPT),
-    ("user",
-     "检索资料：\n"
-     "{context}\n\n"
-     "用户问题：{question}\n\n"
-     "请提供专业回答："),
-])
-
-
-chain = PROMPT_TEMPLATE | RunnableLambda(chat_llm.invoke) | StrOutputParser()
-print("[CheckupAI] LangChain Chain 构建完成")
+# ---- Step 5: 构建场景 ----
+print("[CheckupAI] 构建场景...")
+chat_scenario = ChatScenario(settings.llm_chat_prompt, chat_llm)
+report_scenario = ReportScenario(settings.llm_report_prompt, chat_llm)
+print("[CheckupAI] 场景就绪 (chat + report)")
 
 # ---- Step 6: 启动 FastAPI ----
-
 app = FastAPI(title="CheckupAI API")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -121,97 +152,6 @@ app.add_middleware(
 
 print("[CheckupAI] 启动完成")
 print("=" * 50)
-
-
-# ============================================================
-# Context 格式化
-# ============================================================
-
-def _format_report_items(report_items: List[Dict]) -> str:
-    """格式化体检检验项目"""
-    if not report_items:
-        return ""
-    lines = ["【用户体检报告相关指标】"]
-    for item in report_items:
-        name = item.get("item", "N/A")
-        result = item.get("result", "")
-        unit = item.get("unit", "")
-        ref = item.get("reference_range", "")
-        abnormal = item.get("abnormal", "")
-        table = item.get("table_title", "")
-
-        line = f"- {name}: {result} {unit}"
-        if ref:
-            line += f" (参考范围: {ref})"
-        if abnormal:
-            line += f" [异常: {abnormal}]"
-        if table:
-            line += f"（来自{table}）"
-        lines.append(line)
-    return "\n".join(lines) + "\n"
-
-
-def _format_report_page(page: Dict | None) -> str:
-    """格式化体检报告页面摘要"""
-    if not page:
-        return ""
-    lines = ["【体检报告页面信息】"]
-    exam_date = page.get("exam_date", "")
-    summary = page.get("summary_text", "")
-    if exam_date:
-        lines.append(f"体检日期: {exam_date}")
-    if summary:
-        lines.append(f"摘要: {summary}")
-
-    page_data = page.get("page_data_json", {})
-    if isinstance(page_data, dict):
-        findings = page_data.get("text_analyses", {}).get("positive_findings", [])
-        if findings:
-            lines.append("异常发现:")
-            for f in findings[:5]:
-                f_type = f.get("type", "")
-                f_text = f.get("text", "")
-                lines.append(f"  [{f_type}] {f_text}")
-
-    return "\n".join(lines) + "\n"
-
-
-def _format_chunks(chunks: List[Dict], label: str, text_field: str = "content") -> str:
-    """通用：格式化检索文档（知识库 / 问答资料）"""
-    if not chunks:
-        return ""
-    lines = [f"【{label}】"]
-    for i, doc in enumerate(chunks, 1):
-        score = doc.get("rerank_score", 0)
-        text = doc.get(text_field, "")
-        source = doc.get("source", "") or doc.get("filename", "") or doc.get("summary", "")
-        lines.append(f"[{i}] (score:{score:.2f}) {text}")
-        if source:
-            lines.append(f"    来源: {source}")
-    return "\n".join(lines) + "\n"
-
-
-def _format_context(retrieval: Dict[str, Any]) -> str:
-    """将检索结果格式化为 LLM 完整上下文"""
-    parts = []
-
-    report_items = retrieval.get("report_items", [])
-    if report_items:
-        parts.append(_format_report_items(report_items))
-
-    report_page = retrieval.get("report_page")
-    if report_page:
-        parts.append(_format_report_page(report_page))
-
-    knowledge = retrieval.get("knowledge_chunks", [])
-    if knowledge:
-        parts.append(_format_chunks(knowledge, "权威医学知识", "content"))
-
-    qa = retrieval.get("medical_qa", [])
-    if qa:
-        parts.append(_format_chunks(qa, "相关问答参考", "document"))
-
-    return "\n".join(parts) if parts else "无相关检索资料"
 
 
 # ============================================================
@@ -238,26 +178,34 @@ def read_root():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """主问答入口：三路检索 → LLM 生成回答"""
+    """问答入口：三路检索 → LLM 生成回答"""
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="问题不能为空")
 
-    # Step 1: RAG 检索
     retrieval = rag.retrieve(request.question)
 
-    # Step 2: 格式化上下文
-    context = _format_context(retrieval)
-
-    # Step 3: LLM 生成
     try:
-        answer = chain.invoke({
-            "context": context,
-            "question": request.question,
-        })
+        answer = chat_scenario.invoke(retrieval, request.question)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 调用失败: {str(e)}")
 
     return ChatResponse(answer=answer, retrieval=retrieval)
+
+
+@app.post("/api/report", response_model=ChatResponse)
+async def generate_report(request: ChatRequest):
+    """报告生成入口：三路检索（跳过问答，权威 rerank top 1）→ LLM 生成结构化报告"""
+    if not request.question.strip():
+        raise HTTPException(status_code=400, detail="问题不能为空")
+
+    retrieval = rag.retrieve(request.question, skip_qa=True, knowledge_rerank_k=1)
+
+    try:
+        report = report_scenario.invoke(retrieval, request.question)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM 调用失败: {str(e)}")
+
+    return ChatResponse(answer=report, retrieval=retrieval)
 
 
 @app.get("/api/health")
@@ -266,10 +214,8 @@ def health_check():
     status = {"status": "healthy", "collections": {}}
     try:
         for coll_name in [
-            "report_pages",
-            "report_items",
-            "knowledge_chunks",
-            "medical_qa",
+            "report_pages", "report_items",
+            "knowledge_chunks", "medical_qa",
         ]:
             try:
                 count_result = client.query(

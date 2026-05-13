@@ -157,12 +157,19 @@ class MedicalRAG:
 
     # ---------- 主入口 ----------
 
-    def retrieve(self, query: str) -> Dict[str, Any]:
+    def retrieve(
+        self,
+        query: str,
+        skip_qa: bool = False,
+        knowledge_rerank_k: int = 3,
+    ) -> Dict[str, Any]:
         """
         执行三路检索
 
         Args:
             query: 用户原始输入（口语化）
+            skip_qa: 跳过问答资料检索（报告模式用）
+            knowledge_rerank_k: 权威知识 rerank 后取 top k
 
         Returns:
             {
@@ -199,7 +206,7 @@ class MedicalRAG:
         if need_report:
             report_page = self._retrieve_report_page(query_vec)
 
-        # 路径 C1: knowledge_chunks
+        # 路径 C1: knowledge_chunks（始终检索 10 条，rerank 后取 knowledge_rerank_k 条）
         knowledge_chunks = self._retrieve_and_rerank(
             query=rewritten,
             query_vec=query_vec,
@@ -207,21 +214,23 @@ class MedicalRAG:
             anns_field="content_dense",
             output_fields=["content", "source", "filename"],
             retrieve_k=10,
-            rerank_k=3,
+            rerank_k=knowledge_rerank_k,
             text_field="content",
         )
 
-        # 路径 C2: medical_qa
-        medical_qa = self._retrieve_and_rerank(
-            query=rewritten,
-            query_vec=query_vec,
-            collection=self.cfg.COLLECTION_MEDICAL_QA,
-            anns_field="summary_dense",
-            output_fields=["summary", "document", "department", "text"],
-            retrieve_k=10,
-            rerank_k=3,
-            text_field="document",
-        )
+        # 路径 C2: medical_qa（报告模式下跳过）
+        medical_qa = []
+        if not skip_qa:
+            medical_qa = self._retrieve_and_rerank(
+                query=rewritten,
+                query_vec=query_vec,
+                collection=self.cfg.COLLECTION_MEDICAL_QA,
+                anns_field="summary_dense",
+                output_fields=["summary", "document", "department", "text"],
+                retrieve_k=10,
+                rerank_k=3,
+                text_field="document",
+            )
 
         return {
             "rewritten_query": rewritten,
