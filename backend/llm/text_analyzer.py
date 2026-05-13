@@ -14,6 +14,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, Dict, List
 
+from .base_llm import BaseLLM
 from openai import OpenAI
 
 from backend.config import settings
@@ -23,7 +24,7 @@ from backend.ocr import (OCRResult, Page, PersonalInfo, PositiveFinding,
 from .utils import safe_json_parse
 
 
-class TextAnalyzer:
+class TextAnalyzer(BaseLLM):
     """使用 LLM 分析体检报告文本内容"""
 
     def __init__(

@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
-from backend.llm import TableType
+from backend.llm.table_parse_router import TableType
 
 
 @dataclass
@@ -39,8 +39,8 @@ class RawPageOutput:
 class RawFileOutput:
     """单个文件的原始OCR输出（引擎无关）"""
     input_path: str
-    pages: list[RawPageOutput] = field(default_factory=list)
     ocr_engine: str
+    pages: list[RawPageOutput] = field(default_factory=list)
 
 # ---------------------------------------------------------------------------
 # 带 bbox 的文本块

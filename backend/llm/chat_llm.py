@@ -8,8 +8,10 @@ from typing import Any, Dict, List
 
 from openai import OpenAI
 
+from .base_llm import BaseLLM
 
-class ChatLLM:
+
+class ChatLLM(BaseLLM):
     """vLLM 对话服务，OpenAI 兼容协议，同时支持 LangChain LCEL"""
 
     def __init__(
