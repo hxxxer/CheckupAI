@@ -207,7 +207,7 @@ class UniversalParser:
         return items
 
     @staticmethod
-    def _filter_context_text(blocks: List[Dict[str, Any]]) -> str:
+    def _filter_context_text(blocks) -> str:
         """
         过滤掉无关的个人信息，保留可能作为表格标题的内容
 
@@ -215,7 +215,7 @@ class UniversalParser:
         保留：短文本、医疗检查关键词（血常规、肝功能等）
 
         Args:
-            blocks: text blocks 列表
+            blocks: text blocks 列表 (list[RawBlock])
 
         Returns:
             过滤后的文本字符串
@@ -249,7 +249,7 @@ class UniversalParser:
 
         filtered_lines = []
         for block in blocks:
-            content = block.get("block_content", "").strip()
+            content = getattr(block, 'content', '').strip()
             if not content:
                 continue
 
