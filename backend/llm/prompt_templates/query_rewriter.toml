@@ -137,13 +137,13 @@ output = """
 """
 
 [examples.9]
-title = "日常问候：不需要报告、不需要RAG"
+title = "日常问候 + 身份询问：不需要报告、不需要RAG"
 input = """
-你好
+你好，你是谁
 """
 output = """
 {
-  "rewritten": "你好",
+  "rewritten": "你好，你是谁",
   "need_report": false,
   "enable_rag": false,
   "indicators": []
