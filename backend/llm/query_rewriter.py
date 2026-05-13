@@ -12,7 +12,7 @@ from .utils import safe_json_parse
 
 
 class QueryRewriter(BaseLLM):
-    """查询改写器：去口语化 + 判断是否需要报告 + 联想检验指标"""
+    """查询改写器：去口语化 + 判断是否需要报告/RAG + 联想检验指标"""
 
     def __init__(
         self,
@@ -41,6 +41,7 @@ class QueryRewriter(BaseLLM):
             {
                 "rewritten": "标准化改写查询",
                 "need_report": True/False,
+                "enable_rag": True/False,
                 "indicators": ["指标1", "指标2", ...]
             }
         """
@@ -52,12 +53,14 @@ class QueryRewriter(BaseLLM):
             return {
                 "rewritten": query,
                 "need_report": False,
+                "enable_rag": True,
                 "indicators": [],
             }
 
         return {
             "rewritten": result.get("rewritten", query),
             "need_report": result.get("need_report", False),
+            "enable_rag": result.get("enable_rag", True),
             "indicators": result.get("indicators", []),
         }
 

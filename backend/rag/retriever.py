@@ -175,6 +175,7 @@ class MedicalRAG:
             {
                 "rewritten_query": str,
                 "need_report": bool,
+                "enable_rag": bool,
                 "indicators": [str, ...],
                 "report_items": [dict, ...],
                 "report_page": dict | None,
@@ -188,10 +189,24 @@ class MedicalRAG:
 
         rewritten = rewrite_result["rewritten"]
         need_report = rewrite_result["need_report"]
+        enable_rag = rewrite_result["enable_rag"]
         raw_indicators = rewrite_result["indicators"]
 
         # Step 2: 指标统一化
         indicators = self._normalize_indicators(raw_indicators)
+
+        # RAG 路由：不需要检索知识库则直接返回空结果
+        if not enable_rag:
+            return {
+                "rewritten_query": rewritten,
+                "need_report": need_report,
+                "enable_rag": enable_rag,
+                "indicators": indicators,
+                "report_items": [],
+                "report_page": None,
+                "knowledge_chunks": [],
+                "medical_qa": [],
+            }
 
         # Step 3: 生成向量（一次，共用）
         query_vec = self._get_embedding(rewritten)
@@ -235,6 +250,7 @@ class MedicalRAG:
         return {
             "rewritten_query": rewritten,
             "need_report": need_report,
+            "enable_rag": enable_rag,
             "indicators": indicators,
             "report_items": report_items,
             "report_page": report_page,
