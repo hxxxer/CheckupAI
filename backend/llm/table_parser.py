@@ -73,7 +73,7 @@ class TableParserLLM(BaseLLM):
         Returns:
             解析后的JSON结果
         """
-        if not table_data or not table_data.get("tables"):
+        if not table_data or not table_data.get("markdown"):
             return []
 
         # 构建Prompt
