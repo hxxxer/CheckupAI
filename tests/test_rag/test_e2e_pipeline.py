@@ -40,6 +40,29 @@ def _build_pk(raw: str) -> int:
     return int(h[:16], 16) & 0x7FFFFFFFFFFFFFFF
 
 
+def _save_ocr_debug(results):
+    """OCR 解析结果为空时保存到 temp.json 供排查"""
+    from dataclasses import asdict
+    from datetime import datetime
+
+    # 自定义 encoder 处理 dataclass / datetime / tuple / Enum
+    class _DebugEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if isinstance(obj, tuple):
+                return list(obj)
+            if hasattr(obj, "__dataclass_fields__"):
+                return asdict(obj)
+            return super().default(obj)
+
+    dump_path = os.path.join(settings.project_root, "temp.json")
+    data = json.loads(json.dumps([asdict(r) for r in results], cls=_DebugEncoder))
+    with open(dump_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    print(f"[E2E] OCR 解析结果已保存至 {dump_path}")
+
+
 # ---- 端到端测试 ----
 
 @pytest.mark.skipif(not _ocr_env_available(), reason="OCR 环境不可用（检查 settings.toml）")
@@ -81,6 +104,8 @@ def test_ocr_parse_and_ingest():
             if page.text_analyses and page.text_analyses.summary:
                 total_summaries += 1
 
+    if total_items == 0:
+        _save_ocr_debug(results)
     assert total_items > 0, "应至少解析出一些检验项目"
     print(f"[E2E] 检验项目: {total_items}, 页面摘要: {total_summaries}")
 
@@ -94,6 +119,9 @@ def test_ocr_parse_and_ingest():
 
         ingest_result = ingest_checkup_report(client, results)
         assert ingest_result["pages"] > 0, "应至少入库一个页面"
+
+        if ingest_result["items"] == 0:
+            _save_ocr_debug(results)
         assert ingest_result["items"] > 0, "应至少入库一个检验项目"
         print(f"[E2E] 入库: {ingest_result['pages']} 页, {ingest_result['items']} 项")
 
@@ -113,7 +141,7 @@ def test_ocr_parse_and_ingest():
         target_item = sample_items[0]
         query_result = client.query(
             collection_name="report_items",
-            expr=f'item == "{target_item}"',
+            filter=f'item == "{target_item}"',
             output_fields=["*"],
         )
         assert len(query_result) > 0, f"精确查询 '{target_item}' 应有结果"
@@ -130,7 +158,7 @@ def test_ocr_parse_and_ingest():
         for item_name in set(sample_items):
             results_q = client.query(
                 collection_name="report_items",
-                expr=f'item == "{item_name}"',
+                filter=f'item == "{item_name}"',
                 output_fields=["pk"],
             )
             if results_q:
@@ -165,7 +193,7 @@ def test_ocr_parse_and_ingest():
 
         full_result = client.query(
             collection_name="report_pages",
-            expr="pk > 0",
+            filter="pk > 0",
             output_fields=["page_data_json", "summary_text"],
             limit=1,
         )
