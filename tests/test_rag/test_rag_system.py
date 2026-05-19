@@ -44,7 +44,7 @@ def _milvus_has_data(client):
     try:
         result = client.query(
             collection_name="report_pages",
-            expr="pk > 0",
+            filter="pk > 0",
             output_fields=["pk"],
             limit=1,
         )

@@ -83,7 +83,7 @@ def _auto_ingest_reports():
     try:
         count_result = _client.query(
             collection_name="report_pages",
-            expr="pk > 0",
+            filter="pk > 0",
             output_fields=["pk"],
             limit=1,
         )
@@ -120,7 +120,7 @@ def _auto_ingest_knowledge():
     try:
         count_result = _client.query(
             collection_name="knowledge_chunks",
-            expr="pk > 0",
+            filter="pk > 0",
             output_fields=["pk"],
             limit=1,
         )
@@ -152,7 +152,7 @@ def _auto_ingest_qa():
     try:
         count_result = _client.query(
             collection_name="medical_qa",
-            expr="pk > 0",
+            filter="pk > 0",
             output_fields=["pk"],
             limit=1,
         )
@@ -279,7 +279,7 @@ def health_check():
             try:
                 count_result = _client.query(
                     collection_name=coll_name,
-                    expr="pk > 0",
+                    filter="pk > 0",
                     output_fields=["pk"],
                     limit=1,
                 )

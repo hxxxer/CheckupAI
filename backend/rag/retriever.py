@@ -65,7 +65,7 @@ class MedicalRAG:
             try:
                 results = self.client.query(
                     collection_name=self.cfg.COLLECTION_REPORT_ITEMS,
-                    expr=f'item == "{ind}"',
+                    filter=f'item == "{ind}"',
                     output_fields=["*"],
                 )
                 for row in results:
